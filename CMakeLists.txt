@@ -5,7 +5,6 @@ set(CMAKE_C_STANDARD 11)
 
 add_executable(math_solver
 	src/main.c
- "include/main.h"
 )
 
 target_include_directories(math_solver PUBLIC
