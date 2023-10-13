@@ -77,6 +77,38 @@ add_test(
   COMMAND $<TARGET_FILE:parse_sub_complex>
 )
 
+# parse_ge
+add_executable(parse_ge tests/parse_ge.c)
+target_link_libraries(parse_ge PRIVATE math_solver)
+add_test(
+  NAME parse_ge
+  COMMAND $<TARGET_FILE:parse_ge>
+)
+
+# parse_le
+add_executable(parse_le tests/parse_le.c)
+target_link_libraries(parse_le PRIVATE math_solver)
+add_test(
+  NAME parse_le
+  COMMAND $<TARGET_FILE:parse_le>
+)
+
+# parse_neq
+add_executable(parse_neq tests/parse_neq.c)
+target_link_libraries(parse_neq PRIVATE math_solver)
+add_test(
+  NAME parse_neq
+  COMMAND $<TARGET_FILE:parse_neq>
+)
+
+# parse_number
+add_executable(parse_number tests/parse_number.c)
+target_link_libraries(parse_number PRIVATE math_solver)
+add_test(
+  NAME parse_number
+  COMMAND $<TARGET_FILE:parse_number>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

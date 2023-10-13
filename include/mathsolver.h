@@ -1,6 +1,10 @@
-#include <malloc.h>
+#ifndef _MATHSOLVER_H_
+#define _MATHSOLVER_H_
 
-typedef enum 
+#include <malloc.h>
+#include <memory.h>
+
+typedef enum
 {
 	Number,
 	Variable,
@@ -20,19 +24,25 @@ typedef enum
 	LE,
 	NEQ,
 	OpeningParentheses,
-	ClosingParentheses
+	ClosingParentheses,
+	Factorial
 } mathsolver_operator;
 
 typedef struct
 {
 	mathsolver_token_type type;
-	union 
+	union
 	{
-		char* number;
-		char* variable;
+		char *number;
+		char *variable;
 		mathsolver_operator operator;
 	};
 	int size;
 } mathsolver_token;
 
-int mathsolver_parse(char* str, mathsolver_token** tokens);
+__uint8_t is_numeric(char ch, char hintPrev, char hintNext);
+__uint8_t is_alphabetic(char ch);
+__uint8_t is_whitespace(char ch);
+int mathsolver_parse(char *str, mathsolver_token **tokens);
+
+#endif
