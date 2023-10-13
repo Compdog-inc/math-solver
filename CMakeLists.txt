@@ -109,6 +109,22 @@ add_test(
   COMMAND $<TARGET_FILE:parse_number>
 )
 
+# parse_variable
+add_executable(parse_variable tests/parse_variable.c)
+target_link_libraries(parse_variable PRIVATE math_solver)
+add_test(
+  NAME parse_variable
+  COMMAND $<TARGET_FILE:parse_variable>
+)
+
+# parse_subscript
+add_executable(parse_subscript tests/parse_subscript.c)
+target_link_libraries(parse_subscript PRIVATE math_solver)
+add_test(
+  NAME parse_subscript
+  COMMAND $<TARGET_FILE:parse_subscript>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

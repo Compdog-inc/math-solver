@@ -249,11 +249,6 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 				inSubscript = 1;
 			}
 
-			if (inSubscript && *str == '}')
-			{
-				inSubscript = 0;
-			}
-
 			isOperator = 0;
 			if (currentValueStart == NULL && !is_whitespace(*str))
 			{
@@ -284,6 +279,11 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 						return -1;
 					}
 				}
+			}
+
+			if (inSubscript && *str == '}')
+			{
+				inSubscript = 0;
 			}
 			break;
 		}
