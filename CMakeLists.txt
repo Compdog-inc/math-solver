@@ -157,6 +157,14 @@ add_test(
   COMMAND $<TARGET_FILE:standardize_implicit_mul>
 )
 
+# inflate_depth
+add_executable(inflate_depth tests/inflate_depth.c)
+target_link_libraries(inflate_depth PRIVATE math_solver)
+add_test(
+  NAME inflate_depth
+  COMMAND $<TARGET_FILE:inflate_depth>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

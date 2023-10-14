@@ -16,6 +16,22 @@ void mathsolver_token_free(mathsolver_token** token)
 	*token = NULL;
 }
 
+void mathsolver_inflated_tokens_free(mathsolver_inflated_tokens** tokens)
+{
+	if ((*tokens)->type == InflatedList)
+	{
+		// free children list and children
+		for (int i = 0; i < (*tokens)->children_count; i++)
+		{
+			mathsolver_inflated_tokens_free(&((*tokens)->children[i]));
+		}
+		free((*tokens)->children);
+	}
+
+	free(*tokens);
+	*tokens = NULL;
+}
+
 uint8_t is_numeric(char ch, char hintPrev, char hintNext)
 {
 	/*
@@ -68,43 +84,45 @@ uint8_t is_alphabetic(char ch)
 	}
 }
 
-void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, char** currentValueStart, mathsolver_token*** tokens, int* tokenCount)
+void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, char** currentValueStart, mathsolver_token*** tokens, int* tokenCount, int nTokens)
 {
-	// get size of token
-	int size = sizeof(mathsolver_token_type) + sizeof(char*) + sizeof(int);
-	mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
-	if (token != NULL)
-	{
-		// create token
-		token->type = *currentTokenType;
-		int strLen = (int)(*str - *currentValueStart);
-#if _DEBUG
-		char* dup = malloc(sizeof(char) * ((size_t)strLen + 1)); // create space for null terminator
-#else
-		char* dup = malloc(sizeof(char) * strLen);
-#endif
-		if (dup != NULL)
+	if ((*tokenCount) < nTokens - 1) {
+		// get size of token
+		int size = sizeof(mathsolver_token_type) + sizeof(char*) + sizeof(int);
+		mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+		if (token != NULL)
 		{
-			memcpy(dup, *currentValueStart, strLen);
+			// create token
+			token->type = *currentTokenType;
+			int strLen = (int)(*str - *currentValueStart);
 #if _DEBUG
-			* (dup + strLen) = '\0'; // force null-termination for debugger print
+			char* dup = malloc(sizeof(char) * ((size_t)strLen + 1)); // create space for null terminator
+#else
+			char* dup = malloc(sizeof(char) * strLen);
 #endif
-			if (*currentTokenType == Number)
+			if (dup != NULL)
 			{
-				token->number = dup;
+				memcpy(dup, *currentValueStart, strLen);
+#if _DEBUG
+				* (dup + strLen) = '\0'; // force null-termination for debugger print
+#endif
+				if (*currentTokenType == Number)
+				{
+					token->number = dup;
+				}
+				else if (*currentTokenType == Variable)
+				{
+					token->number = dup;
+				}
 			}
-			else if (*currentTokenType == Variable)
-			{
-				token->number = dup;
-			}
+			token->size = strLen;
+			(*tokens)[(*tokenCount)++] = token;
 		}
-		token->size = strLen;
-		(*tokens)[(*tokenCount)++] = token;
 	}
 	*currentValueStart = NULL;
 }
 
-int mathsolver_parse(char *str, mathsolver_token **tokens)
+int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 {
 	int tokenCount = 0;
 	uint8_t strPos = 0;
@@ -343,12 +361,14 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 
 		if (isOperator && currentValueStart != NULL)
 		{
-			mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount);
+			mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount, nTokens);
 		}
 
 		if (queuedToken != NULL)
 		{
-			tokens[tokenCount++] = queuedToken;
+			if (tokenCount < nTokens - 1) {
+				tokens[tokenCount++] = queuedToken;
+			}
 			if (queuedToken->type == Operator)
 			{
 				// Skip any necessary chars depending on operator
@@ -372,7 +392,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 	// apply token after EOL
 	if (currentValueStart != NULL)
 	{
-		mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount);
+		mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount, nTokens);
 	}
 
 	return tokenCount;
@@ -512,4 +532,218 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 	}
 
 	return nTokens;
+}
+
+mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nTokens)
+{
+	mathsolver_inflated_tokens* root = malloc(sizeof(mathsolver_inflated_tokens));
+	if (root == NULL) return NULL;
+
+	mathsolver_inflated_tokens* currentChild = root;
+	mathsolver_token** currentDepthTokens = malloc(sizeof(mathsolver_token*) * nTokens);
+	if (currentDepthTokens != NULL) {
+		int tind = 0;
+		int depth = 0;
+		root->depth = depth;
+		root->parent = NULL;
+		root->initialized = 0;
+		for (int i = 0; i < nTokens; i++)
+		{
+			if (tokens[i]->type == Operator && tokens[i]->operator == OpeningParentheses)
+			{
+				depth++;
+				
+				mathsolver_inflated_tokens* tmp = currentChild;
+				// add current depth tokens to current depth child
+				currentChild->type = InflatedList;
+				if (!currentChild->initialized)
+				{
+					currentChild->initialized = 1;
+					currentChild->children_count = 0;
+					currentChild->max_count = tind;
+					currentChild->children = malloc(sizeof(mathsolver_inflated_tokens*) * currentChild->max_count);
+				}
+				for (int j = 0; j < tind; j++)
+				{
+					mathsolver_inflated_tokens* child = malloc(sizeof(mathsolver_inflated_tokens));
+					if (child == NULL) return NULL;
+					child->type = Token;
+					child->depth = depth;
+					child->token = currentDepthTokens[j];
+					child->parent = currentChild;
+					child->initialized = 1;
+
+					if (currentChild->children_count >= currentChild->max_count)
+					{
+						mathsolver_inflated_tokens** rel = realloc(currentChild->children, sizeof(mathsolver_inflated_tokens*) * currentChild->max_count * 2);
+						if (rel != NULL)
+						{
+							currentChild->children = rel;
+							currentChild->max_count = currentChild->max_count * 2;
+						}
+						else
+						{
+							return NULL;
+						}
+					}
+					currentChild->children[currentChild->children_count++] = child;
+				}
+				tind = 0;
+
+				// create new depth list
+				currentChild = malloc(sizeof(mathsolver_inflated_tokens));
+				if (currentChild != NULL)
+				{
+					currentChild->depth = depth;
+					currentChild->parent = tmp;
+					currentChild->initialized = 0;
+
+					if (tmp->children_count >= tmp->max_count)
+					{
+						mathsolver_inflated_tokens** rel = realloc(tmp->children, sizeof(mathsolver_inflated_tokens*) * tmp->max_count * 2);
+						if (rel != NULL)
+						{
+							tmp->children = rel;
+							tmp->max_count = tmp->max_count * 2;
+						}
+						else
+						{
+							return NULL;
+						}
+					}
+					tmp->children[tmp->children_count++] = currentChild;
+				}
+				else
+				{
+					return NULL;
+				}
+			}
+			else if (tokens[i]->type == Operator && tokens[i]->operator == ClosingParentheses)
+			{
+				if (depth > 0)
+				{
+					depth--;
+
+					// add current depth tokens to current depth child
+					currentChild->type = InflatedList;
+					if (!currentChild->initialized)
+					{
+						currentChild->initialized = 1;
+						currentChild->children_count = 0;
+						currentChild->max_count = tind;
+						currentChild->children = malloc(sizeof(mathsolver_inflated_tokens*) * currentChild->max_count);
+					}
+					for (int j = 0; j < tind; j++)
+					{
+						mathsolver_inflated_tokens* child = malloc(sizeof(mathsolver_inflated_tokens));
+						if (child == NULL) return NULL;
+						child->type = Token;
+						child->depth = currentChild->depth + 1;
+						child->token = currentDepthTokens[j];
+						child->parent = currentChild;
+						child->initialized = 1;
+
+						if (currentChild->children_count >= currentChild->max_count)
+						{
+							mathsolver_inflated_tokens** rel = realloc(currentChild->children, sizeof(mathsolver_inflated_tokens*) * currentChild->max_count * 2);
+							if (rel != NULL)
+							{
+								currentChild->children = rel;
+								currentChild->max_count = currentChild->max_count * 2;
+							}
+							else
+							{
+								return NULL;
+							}
+						}
+						currentChild->children[currentChild->children_count++] = child;
+					}
+					tind = 0;
+
+					// set current depth to parent
+					currentChild = currentChild->parent;
+				}
+				else
+				{
+					// illegal closing parenthese without opening pair
+					return NULL;
+				}
+			}
+			else
+			{
+				currentDepthTokens[tind++] = tokens[i];
+			}
+		}
+		if (tind > 0)
+		{
+			// has leftover tokens in depth
+			if (depth > 0)
+				return NULL; // invalid syntax: every opening parentheses requires a closing pair
+
+			if (tind == 1 && nTokens == 1)
+			{
+				root->initialized = 1;
+				root->type = Token;
+				root->token = currentDepthTokens[0];
+			}
+			else
+			{
+				// add current depth tokens to current depth child
+				root->type = InflatedList;
+				if (!root->initialized)
+				{
+					root->initialized = 1;
+					root->children_count = 0;
+					root->max_count = tind;
+					root->children = malloc(sizeof(mathsolver_inflated_tokens) * root->max_count);
+				}
+				for (int j = 0; j < tind; j++)
+				{
+					mathsolver_inflated_tokens* child = malloc(sizeof(mathsolver_inflated_tokens));
+					if (child == NULL) return NULL;
+					child->type = Token;
+					child->depth = root->depth+1;
+					child->token = currentDepthTokens[j];
+					child->parent = root;
+					child->initialized = 1;
+
+					if (root->children_count >= root->max_count)
+					{
+						mathsolver_inflated_tokens** rel = realloc(root->children, sizeof(mathsolver_inflated_tokens*) * root->max_count * 2);
+						if (rel != NULL)
+						{
+							root->children = rel;
+							root->max_count = root->max_count * 2;
+						}
+						else
+						{
+							return NULL;
+						}
+					}
+					if(root->children != NULL)
+						root->children[root->children_count++] = child;
+				}
+				tind = 0;
+			}
+		}
+		free(currentDepthTokens);
+	}
+
+	return root;
+}
+
+mathsolver_expression* mathsolver_to_expression(mathsolver_token** tokens, int nTokens)
+{
+	for (int i = 0; i < nTokens; i++)
+	{
+		if (tokens[i]->type == Operator)
+		{
+
+		}
+	}
+}
+
+int mathsolver_from_expression(mathsolver_expression* expression, mathsolver_token** tokens, int nTokens)
+{
+
 }
