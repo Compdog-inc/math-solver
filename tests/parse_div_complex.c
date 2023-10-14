@@ -3,7 +3,7 @@
 int main()
 {
 	mathsolver_token* tokens[16];
-	int count = mathsolver_parse("3/x/y/4", tokens);
+	int count = mathsolver_parse("3/x/y/4", tokens, 16);
 	if (
 		count == 7 &&
 		tokens[1]->type == Operator &&

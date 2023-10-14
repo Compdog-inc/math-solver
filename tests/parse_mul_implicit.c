@@ -4,7 +4,7 @@
 int main()
 {
 	mathsolver_token* tokens[16];
-	int count = mathsolver_parse("3x+xy+x(3yx)", tokens);
+	int count = mathsolver_parse("3x+xy+x(3yx)", tokens, 16);
 	if (
 		count == 12 &&
 		token_isnum(tokens[0], 3) &&

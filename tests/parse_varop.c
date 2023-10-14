@@ -4,7 +4,7 @@
 int main()
 {
     mathsolver_token *tokens[20];
-    int count = mathsolver_parse("x>=y<=z!=a=b!+h(a)", tokens);
+    int count = mathsolver_parse("x>=y<=z!=a=b!+h(a)", tokens, 20);
     if (
         count == 15 &&
         token_isvar(tokens[0], "x") &&

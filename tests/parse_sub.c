@@ -3,7 +3,7 @@
 int main()
 {
 	mathsolver_token* tokens[16];
-	int count = mathsolver_parse("5*3", tokens);
+	int count = mathsolver_parse("5*3", tokens, 16);
 	if (
 		count == 3 &&
 		tokens[1]->type == Operator &&

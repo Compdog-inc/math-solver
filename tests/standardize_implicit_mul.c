@@ -5,7 +5,7 @@
 int main()
 {
 	mathsolver_token* tokens[32];
-	int count = mathsolver_parse("3x(2x2y+5)x(2zz)3x", tokens);
+	int count = mathsolver_parse("3x(2x2y+5)x(2zz)3x", tokens, 32);
 	count = mathsolver_standardize(tokens, count, 32);
 	if (count == 29 &&
 		token_isnum(tokens[0], 3) &&
