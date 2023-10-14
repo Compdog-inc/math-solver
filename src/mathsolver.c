@@ -1,5 +1,21 @@
 #include "mathsolver.h"
 
+void mathsolver_token_free(mathsolver_token** token)
+{
+	switch((*token)->type)
+	{
+	case Variable:
+		free((*token)->variable);
+		break;
+	case Number:
+		free((*token)->number);
+		break;
+	}
+
+	free(*token);
+	*token = NULL;
+}
+
 uint8_t is_numeric(char ch, char hintPrev, char hintNext)
 {
 	/*
@@ -100,6 +116,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 	while (*str) // read characters until null
 	{
 		uint8_t isOperator = 1;
+		uint8_t unknownOp = 0;
 		mathsolver_token *queuedToken = NULL;
 
 		switch (*str)
@@ -190,7 +207,6 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 				token->type = Operator;
 				if (*(str + 1) == '=')
 				{
-					str++;
 					token->operator= GE;
 				}
 				else
@@ -213,7 +229,6 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 				token->type = Operator;
 				if (*(str + 1) == '=')
 				{
-					str++;
 					token->operator= LE;
 				}
 				else
@@ -266,7 +281,6 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 				token->type = Operator;
 				if (*(str + 1) == '=')
 				{
-					str++;
 					token->operator= NEQ;
 				}
 				else
@@ -304,6 +318,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 			{
 				if (currentTokenType == Number && !is_numeric(*str, strPos ? *(str - 1) : '\0', (char)*(str + 1)))
 				{
+					unknownOp = 1;
 					isOperator = 1;
 				}
 				else if (currentTokenType == Variable)
@@ -333,10 +348,24 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 		if (queuedToken != NULL)
 		{
 			tokens[tokenCount++] = queuedToken;
+			if (queuedToken->type == Operator)
+			{
+				// Skip any necessary chars depending on operator
+				switch (queuedToken->operator)
+				{
+				case GE:
+				case LE:
+				case NEQ:
+					str++;
+					break;
+				}
+			}
 		}
 
-		str++;		// move start of string to next character
-		strPos = 1; // only care about non-zero
+		if (!unknownOp) {
+			str++;		// move start of string to next character
+			strPos = 1; // only care about non-zero
+		}
 	}
 
 	// apply token after EOL
@@ -346,4 +375,94 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 	}
 
 	return tokenCount;
+}
+
+int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens)
+{
+	int ind = 0;
+	for (int i = 0; i < nTokens; i++)
+	{
+		if (tokens[i]->type == Operator)
+		{
+			switch (tokens[i]->operator)
+			{
+			case Add:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '+';
+				break;
+			case Sub:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '-';
+				break;
+			case Mul:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '*';
+				break;
+			case Div:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '/';
+				break;
+			case EQ:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '=';
+				break;
+			case GT:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '>';
+				break;
+			case LT:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '<';
+				break;
+			case GE:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '>';
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '=';
+				break;
+			case LE:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '<';
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '=';
+				break;
+			case NEQ:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '!';
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '=';
+				break;
+			case OpeningParentheses:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '(';
+				break;
+			case ClosingParentheses:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = ')';
+				break;
+			case Factorial:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '!';
+				break;
+			}
+		}
+		else if(tokens[i]->type == Variable)
+		{
+			for (int j = 0; j < tokens[i]->size; j++)
+			{
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = tokens[i]->variable[j];
+			}
+		}
+		else if (tokens[i]->type == Number)
+		{
+			for (int j = 0; j < tokens[i]->size; j++)
+			{
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = tokens[i]->number[j];
+			}
+		}
+	}
+	output[ind++] = '\0';
+	return ind;
 }

@@ -125,6 +125,22 @@ add_test(
   COMMAND $<TARGET_FILE:parse_subscript>
 )
 
+# parse_varop
+add_executable(parse_varop tests/parse_varop.c)
+target_link_libraries(parse_varop PRIVATE math_solver)
+add_test(
+  NAME parse_varop
+  COMMAND $<TARGET_FILE:parse_varop>
+)
+
+# format_round
+add_executable(format_round tests/format_round.c)
+target_link_libraries(format_round PRIVATE math_solver)
+add_test(
+  NAME format_round
+  COMMAND $<TARGET_FILE:format_round>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

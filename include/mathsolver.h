@@ -42,9 +42,13 @@ typedef struct
 	int size;
 } mathsolver_token;
 
+void mathsolver_token_free(mathsolver_token** token);
+
 uint8_t is_numeric(char ch, char hintPrev, char hintNext);
 uint8_t is_alphabetic(char ch);
 uint8_t is_whitespace(char ch);
+
 int mathsolver_parse(char *str, mathsolver_token **tokens);
+int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
 
 #endif
