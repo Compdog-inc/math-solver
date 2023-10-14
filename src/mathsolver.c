@@ -324,10 +324,11 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 				else if (currentTokenType == Variable)
 				{
 					// check if in not in subscript and detect invalid chars
-					// (anything after first letter that is not subscript is illegal)
+					// (anything after first letter that is not subscript is new token)
 					if (!inSubscript)
 					{
-						return -1;
+						unknownOp = 1;
+						isOperator = 1;
 					}
 				}
 			}
@@ -465,4 +466,50 @@ int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int 
 	}
 	output[ind++] = '\0';
 	return ind;
+}
+
+int mathsolver_insert_token(mathsolver_token* token, int index, mathsolver_token** tokens, int nTokens, int limitTokens)
+{
+	nTokens++;
+	if (nTokens <= limitTokens) {
+		for (int i = nTokens; i > index; i--)
+		{
+			tokens[i] = tokens[i - 1];
+		}
+		tokens[index] = token;
+	}
+	return nTokens;
+}
+
+int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens)
+{
+	for (int i = 0; i < nTokens; i++)
+	{
+		// check for implicit multiplication
+		// [not-op][var] or [var][not-op] or [not-op][opar] or [cpar][not-op]
+		// for example: 3x, yx, x3[x], xy[x], 3(, x(, )3[x], )x
+		if (
+			(i > 0 && tokens[i]->type == Variable && tokens[i - 1]->type != Operator) ||
+			(i > 0 && tokens[i]->type != Operator && tokens[i - 1]->type == Variable) ||
+			(i > 0 && tokens[i]->type == Operator && tokens[i]->operator == OpeningParentheses && tokens[i - 1]->type != Operator) ||
+			(i > 0 && tokens[i]->type != Operator && tokens[i - 1]->type == Operator && tokens[i - 1]->operator == ClosingParentheses)
+			)
+		{
+			// get size of token
+			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+			if (token != NULL)
+			{
+				// create token
+				token->type = Operator;
+				token->operator= Mul;
+				token->size = size;
+
+				// insert Mul op at current index and shift tokens
+				nTokens = mathsolver_insert_token(token, i, tokens, nTokens, limitTokens);
+			}
+		}
+	}
+
+	return nTokens;
 }

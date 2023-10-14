@@ -149,6 +149,14 @@ add_test(
   COMMAND $<TARGET_FILE:format_round>
 )
 
+# standardize_implicit_mul
+add_executable(standardize_implicit_mul tests/standardize_implicit_mul.c)
+target_link_libraries(standardize_implicit_mul PRIVATE math_solver)
+add_test(
+  NAME standardize_implicit_mul
+  COMMAND $<TARGET_FILE:standardize_implicit_mul>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

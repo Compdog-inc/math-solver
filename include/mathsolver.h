@@ -51,4 +51,6 @@ uint8_t is_whitespace(char ch);
 int mathsolver_parse(char *str, mathsolver_token **tokens);
 int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
 
+int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens);
+
 #endif
