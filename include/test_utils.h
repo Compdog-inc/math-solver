@@ -71,7 +71,7 @@ uint8_t token_isfac(mathsolver_token *token)
 
 uint8_t token_isvar(mathsolver_token *token, char *cmp)
 {
-    int cl = strlen(cmp);
+    int cl = (int)strlen(cmp);
     if (token->size != cl)
         return 0;
     return token->type == Variable && strcmp(token->variable, cmp) == 0;
@@ -81,7 +81,7 @@ uint8_t token_isnum(mathsolver_token *token, double num)
 {
     char buf[256];
     snprintf(buf, 256, "%f", num);
-    int len = strlen(buf);
+    int len = (int)strlen(buf);
     char *ptr = buf + len - 1;
     if (strchr(buf, '.') != NULL)
     {

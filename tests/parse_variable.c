@@ -5,7 +5,7 @@
 int main()
 {
 	mathsolver_token *tokens[16];
-	int count = mathsolver_parse("3*x=5+3/x", &tokens);
+	int count = mathsolver_parse("3*x=5+3/x", tokens);
 	if (
 		count == 9 &&
 		token_isnum(tokens[0], 3) &&

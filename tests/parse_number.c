@@ -5,7 +5,7 @@
 int main()
 {
 	mathsolver_token *tokens[16];
-	int count = mathsolver_parse("13+5.23-98/(2.3+5)", &tokens);
+	int count = mathsolver_parse("13+5.23-98/(2.3+5)", tokens);
 	if (
 		count == 11 &&
 		token_isnum(tokens[0], 13) &&
