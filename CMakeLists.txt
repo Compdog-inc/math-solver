@@ -29,6 +29,14 @@ add_test(
   COMMAND $<TARGET_FILE:parse_mul_complex>
 )
 
+# parse_mul_implicit
+add_executable(parse_mul_implicit tests/parse_mul_implicit.c)
+target_link_libraries(parse_mul_implicit PRIVATE math_solver)
+add_test(
+  NAME parse_mul_implicit
+  COMMAND $<TARGET_FILE:parse_mul_implicit>
+)
+
 # parse_div
 add_executable(parse_div tests/parse_div.c)
 target_link_libraries(parse_div PRIVATE math_solver)
