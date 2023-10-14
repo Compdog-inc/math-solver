@@ -88,7 +88,7 @@ void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, ch
 {
 	if ((*tokenCount) < nTokens - 1) {
 		// get size of token
-		int size = sizeof(mathsolver_token_type) + sizeof(char*) + sizeof(int);
+		int size = sizeof(mathsolver_token);
 		mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
 		if (token != NULL)
 		{
@@ -142,7 +142,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '*':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -157,7 +157,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '/':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -172,7 +172,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '+':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -187,7 +187,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '-':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -202,7 +202,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '=':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -217,7 +217,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '>':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -239,7 +239,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '<':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -261,7 +261,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '(':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -276,7 +276,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case ')':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -291,7 +291,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 		case '!':
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -516,7 +516,7 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 			)
 		{
 			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(mathsolver_operator) + sizeof(int);
+			int size = sizeof(mathsolver_token);
 			mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
 			if (token != NULL)
 			{
@@ -730,6 +730,87 @@ mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nT
 	}
 
 	return root;
+}
+
+int mathsolver_count_inflated(mathsolver_inflated_tokens* tokens)
+{
+	if (tokens->type == Token)
+	{
+		return 1;
+	}
+	else
+	{
+		// add number of tokens in children
+		int c = tokens->depth > 0 ? 2 : 0; // surround token with parenthesis
+		for (int i = 0; i < tokens->children_count; i++)
+		{
+			c += mathsolver_count_inflated(tokens->children[i]);
+		}
+		return c;
+	}
+}
+
+int mathsolver_copy_tokens(mathsolver_inflated_tokens* tokens, mathsolver_token** dest, int index, int limit)
+{
+	if (tokens->type == Token)
+	{
+		if (index < limit) {
+			dest[index++] = tokens->token;
+		}
+		return index;
+	}
+	else
+	{
+		int ind = index;
+
+		// surround token with parenthesis
+		if (tokens->depth > 0)
+		{
+			if (ind < limit) {
+				// get size of token
+				int size = sizeof(mathsolver_token);
+				mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+				if (token != NULL)
+				{
+					// create token
+					token->type = Operator;
+					token->operator= OpeningParentheses;
+					token->size = size;
+					dest[ind++] = token;
+				}
+			}
+		}
+
+		// copy tokens in children
+		for (int i = 0; i < tokens->children_count; i++)
+		{
+			ind = mathsolver_copy_tokens(tokens->children[i], dest, ind, limit);
+		}
+
+		// surround token with parenthesis
+		if (tokens->depth > 0)
+		{
+			if (ind < limit) {
+				// get size of token
+				int size = sizeof(mathsolver_token);
+				mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+				if (token != NULL)
+				{
+					// create token
+					token->type = Operator;
+					token->operator= ClosingParentheses;
+					token->size = size;
+					dest[ind++] = token;
+				}
+			}
+		}
+		return ind;
+	}
+}
+
+int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** deflated, int sDeflated)
+{
+	return mathsolver_copy_tokens(tokens, deflated, 0, sDeflated);
 }
 
 mathsolver_expression* mathsolver_to_expression(mathsolver_token** tokens, int nTokens)

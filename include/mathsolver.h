@@ -119,7 +119,10 @@ int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int 
 int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens);
 
 mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nTokens);
+int mathsolver_count_inflated(mathsolver_inflated_tokens* tokens);
+int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** deflated, int sDeflated);
 
+// Note: requires standardized tokens
 mathsolver_expression* mathsolver_to_expression(mathsolver_token** tokens, int nTokens);
 int mathsolver_from_expression(mathsolver_expression* expression, mathsolver_token** tokens, int nTokens);
 

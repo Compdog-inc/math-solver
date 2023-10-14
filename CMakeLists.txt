@@ -165,6 +165,14 @@ add_test(
   COMMAND $<TARGET_FILE:inflate_depth>
 )
 
+# inflate_round
+add_executable(inflate_round tests/inflate_round.c)
+target_link_libraries(inflate_round PRIVATE math_solver)
+add_test(
+  NAME inflate_round
+  COMMAND $<TARGET_FILE:inflate_round>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
