@@ -1,6 +1,8 @@
 #ifndef _MATHSOLVER_H_
 #define _MATHSOLVER_H_
 
+#include <string.h>
+#include <stdint.h>
 #include <malloc.h>
 #include <memory.h>
 
@@ -40,9 +42,9 @@ typedef struct
 	int size;
 } mathsolver_token;
 
-__uint8_t is_numeric(char ch, char hintPrev, char hintNext);
-__uint8_t is_alphabetic(char ch);
-__uint8_t is_whitespace(char ch);
+uint8_t is_numeric(char ch, char hintPrev, char hintNext);
+uint8_t is_alphabetic(char ch);
+uint8_t is_whitespace(char ch);
 int mathsolver_parse(char *str, mathsolver_token **tokens);
 
 #endif

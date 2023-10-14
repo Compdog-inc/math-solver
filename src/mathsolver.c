@@ -1,6 +1,6 @@
 #include "mathsolver.h"
 
-__uint8_t is_numeric(char ch, char hintPrev, char hintNext)
+uint8_t is_numeric(char ch, char hintPrev, char hintNext)
 {
 	/*
 		!NOTE! Does not count (-) as numeric because the lexer parses that as [0][sub][numeric]
@@ -22,7 +22,7 @@ __uint8_t is_numeric(char ch, char hintPrev, char hintNext)
 	}
 }
 
-__uint8_t is_whitespace(char ch)
+uint8_t is_whitespace(char ch)
 {
 	if (ch == ' ' || ch == '\n' || ch == '\r')
 	{
@@ -34,7 +34,7 @@ __uint8_t is_whitespace(char ch)
 	}
 }
 
-__uint8_t is_alphabetic(char ch)
+uint8_t is_alphabetic(char ch)
 {
 	// A-Z
 	if (ch >= 'A' && ch <= 'Z')
@@ -52,18 +52,54 @@ __uint8_t is_alphabetic(char ch)
 	}
 }
 
+void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, char** currentValueStart, mathsolver_token*** tokens, int* tokenCount)
+{
+	// get size of token
+	int size = sizeof(mathsolver_token_type) + sizeof(char*) + sizeof(int);
+	mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+	if (token != NULL)
+	{
+		// create token
+		token->type = *currentTokenType;
+		int strLen = (int)(*str - *currentValueStart);
+#if _DEBUG
+		char* dup = malloc(sizeof(char) * ((size_t)strLen + 1)); // create space for null terminator
+#else
+		char* dup = malloc(sizeof(char) * strLen);
+#endif
+		if (dup != NULL)
+		{
+			memcpy(dup, *currentValueStart, strLen);
+#if _DEBUG
+			* (dup + strLen) = '\0'; // force null-termination for debugger print
+#endif
+			if (*currentTokenType == Number)
+			{
+				token->number = dup;
+			}
+			else if (*currentTokenType == Variable)
+			{
+				token->number = dup;
+			}
+		}
+		token->size = strLen;
+		(*tokens)[(*tokenCount)++] = token;
+	}
+	*currentValueStart = NULL;
+}
+
 int mathsolver_parse(char *str, mathsolver_token **tokens)
 {
 	int tokenCount = 0;
-	__uint8_t strPos = 0;
+	uint8_t strPos = 0;
 
 	char *currentValueStart = NULL;
-	__uint8_t inSubscript = 0;
+	uint8_t inSubscript = 0;
 	mathsolver_token_type currentTokenType;
 
 	while (*str) // read characters until null
 	{
-		__uint8_t isOperator = 1;
+		uint8_t isOperator = 1;
 		mathsolver_token *queuedToken = NULL;
 
 		switch (*str)
@@ -291,26 +327,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 
 		if (isOperator && currentValueStart != NULL)
 		{
-			// get size of token
-			int size = sizeof(mathsolver_token_type) + sizeof(char *) + sizeof(int);
-			mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
-			if (token != NULL)
-			{
-				// create token
-				token->type = currentTokenType;
-				int strLen = (int)(str - currentValueStart);
-				if (currentTokenType == Number)
-				{
-					token->number = strndup(currentValueStart, strLen);
-				}
-				else if (currentTokenType == Variable)
-				{
-					token->number = strndup(currentValueStart, strLen);
-				}
-				token->size = strLen;
-				tokens[tokenCount++] = token;
-			}
-			currentValueStart = NULL;
+			mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount);
 		}
 
 		if (queuedToken != NULL)
@@ -325,26 +342,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens)
 	// apply token after EOL
 	if (currentValueStart != NULL)
 	{
-		// get size of token
-		int size = sizeof(mathsolver_token_type) + sizeof(char *) + sizeof(int);
-		mathsolver_token *token = (mathsolver_token *)malloc(size); // allocate
-		if (token != NULL)
-		{
-			// create token
-			token->type = currentTokenType;
-			int strLen = (int)(str - currentValueStart);
-			if (currentTokenType == Number)
-			{
-				token->number = strndup(currentValueStart, strLen);
-			}
-			else if (currentTokenType == Variable)
-			{
-				token->number = strndup(currentValueStart, strLen);
-			}
-			token->size = strLen;
-			tokens[tokenCount++] = token;
-		}
-		currentValueStart = NULL;
+		mathsolver_addtoken(&currentTokenType, &str, &currentValueStart, &tokens, &tokenCount);
 	}
 
 	return tokenCount;
