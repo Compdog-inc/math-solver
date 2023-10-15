@@ -7,6 +7,7 @@
 #include <memory.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 typedef enum
 {
@@ -110,6 +111,7 @@ typedef struct _mathsolver_expression
 		};
 	};
 	struct _mathsolver_expression* parent;
+	struct _mathsolver_expression* copy_of;
 } mathsolver_expression;
 
 void mathsolver_token_free(mathsolver_token** token);
@@ -120,6 +122,7 @@ void mathsolver_expression_free(mathsolver_expression** expression);
 uint8_t is_numeric(char ch, char hintPrev, char hintNext);
 uint8_t is_alphabetic(char ch);
 uint8_t is_whitespace(char ch);
+uint8_t is_integer(double value);
 
 int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens);
 int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
@@ -136,5 +139,7 @@ int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** de
 // Note: requires standardized tokens
 mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens);
 mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression);
+
+mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression);
 
 #endif

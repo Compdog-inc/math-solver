@@ -87,9 +87,12 @@ uint8_t token_isnum(mathsolver_token *token, double num)
     {
         while (*ptr == '0' || *ptr == '.' /* decimal */)
         {
+            char p = *ptr;
             *ptr = '\0';
             ptr--;
             len--;
+            if (p == '.')
+                break;
         }
     }
 

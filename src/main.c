@@ -210,43 +210,57 @@ void printExpression(mathsolver_expression* expression, int depth)
 
 int main()
 {
-	char* str = "3x*(2x+(2y-3)+5)x(2(z/2)z)3x";
-	printf("Expression: %s\n", str);
+	while (1) {
+		printf("Enter expression:\n");
 
-	mathsolver_token* tokens[64];
-	int count = mathsolver_parse(str, tokens, 64);
-	count = mathsolver_standardize(tokens, count, 64, 0);
+		char str[256];
+		if (gets_s(str, 256) == NULL)
+			return 1;
 
-	char output[256];
-	mathsolver_format(output, 256, tokens, count);
-	printf("Standardized: %s\n", output);
+		mathsolver_token* tokens[64];
+		int count = mathsolver_parse(str, tokens, 64);
+		count = mathsolver_standardize(tokens, count, 64, 0);
 
-	mathsolver_inflated_tokens* inflated = mathsolver_inflate(tokens, count);
-	printInflatedTokens(inflated);
+		char output[256];
+		mathsolver_format(output, 256, tokens, count);
+		printf("Standardized: %s\n", output);
 
-	mathsolver_expression* expression = mathsolver_to_expression(inflated);
-	printf("Instruction expression:\n");
-	printExpression(expression, 0);
+		mathsolver_inflated_tokens* inflated = mathsolver_inflate(tokens, count);
+		printInflatedTokens(inflated);
 
-	mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(expression);
-	printf("Inflated out:\n");
-	printInflatedTokens(inflatedOut);
+		mathsolver_expression* expression = mathsolver_to_expression(inflated);
+		printf("Instruction expression:\n");
+		printExpression(expression, 0);
 
-	mathsolver_token* tokensOut[64];
-	int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
-	mathsolver_format(output, 256, tokensOut, countOut);
-	printf("Deflated: %s\n", output);
+		printf("Evaluating expression...\n");
+		mathsolver_expression* eval = mathsolver_evaluate(expression);
+		printf("Evaluated expression:\n");
+		printExpression(eval, 0);
 
-	countOut = mathsolver_reduce(tokensOut, countOut);
-	mathsolver_format(output, 256, tokensOut, countOut);
-	printf("Expression out: %s\n", output);
+		mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(eval);
+		printf("Inflated out:\n");
+		printInflatedTokens(inflatedOut);
 
-	mathsolver_expression_free(&expression);
-	mathsolver_inflated_tokens_free(&inflated);
-	for (int i = 0; i < count; i++)
-	{
-		mathsolver_token_free(&tokens[i]);
+		mathsolver_token* tokensOut[64];
+		int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
+		mathsolver_format(output, 256, tokensOut, countOut);
+		printf("Deflated: %s\n", output);
+
+		countOut = mathsolver_reduce(tokensOut, countOut);
+		mathsolver_format(output, 256, tokensOut, countOut);
+		printf("Expression out: %s\n", output);
+
+		if (eval->copy_of != NULL) // free eval result if it's a copy
+			mathsolver_expression_free(&eval);
+
+		mathsolver_expression_free(&expression);
+		mathsolver_inflated_tokens_free(&inflated);
+		for (int i = 0; i < count; i++)
+		{
+			mathsolver_token_free(&tokens[i]);
+		}
+
+		printf("Done.\n");
 	}
-
 	return 0;
 }

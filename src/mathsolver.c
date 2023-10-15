@@ -99,6 +99,18 @@ uint8_t is_alphabetic(char ch)
 	}
 }
 
+uint8_t is_integer(double value)
+{
+	if (fabs(round(value) - value) <= 0.00000001)
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
 void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, char** currentValueStart, mathsolver_token*** tokens, int* tokenCount, int nTokens)
 {
 	if ((*tokenCount) < nTokens - 1) {
@@ -528,6 +540,7 @@ int mathsolver_remove_token(int index, mathsolver_token** tokens, int nTokens)
 
 int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens, uint8_t flags)
 {
+	// single token pass
 	for (int i = 0; i < nTokens && i < limitTokens; i++)
 	{
 		// check for implicit multiplication
@@ -560,7 +573,195 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 		{
 			// explicitly state order of operations
 			// 3*1/1+2 becomes ((3*1)/1)+2
-			if (i > 0 && tokens[i]->type == Operator)
+			if (tokens[i]->type == Operator)
+			{
+				switch (tokens[i]->operator)
+				{
+				case Factorial:
+				{
+					// explicitly state factorial operator
+					// -3!*2 becomes -(3!)*2
+					if (i>0 && i < nTokens && i < limitTokens)
+					{
+						int openIndex = i - 1;
+						int closeIndex = i + 1;
+
+						if (tokens[i - 1]->type != Operator)
+						{
+							openIndex = i - 1;
+						}
+						else if (tokens[i - 1]->operator == ClosingParentheses)
+						{
+							// search left for opening parentheses with same relative depth
+							int depth = 0;
+							for (int j = i - 2; j >= 0; j--)
+							{
+								if (tokens[j]->type == Operator)
+								{
+									if (tokens[j]->operator == ClosingParentheses)
+									{
+										depth++;
+									}
+									else if (tokens[j]->operator == OpeningParentheses)
+									{
+										if (depth == 0)
+										{
+											openIndex = j;
+											break;
+										}
+										else
+										{
+											depth--;
+										}
+									}
+								}
+							}
+						}
+
+						// get size of token
+						int size = sizeof(mathsolver_token);
+						mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= OpeningParentheses;
+							token->size = size;
+
+							// insert opar op at open index and shift tokens
+							nTokens = mathsolver_insert_token(token, openIndex, tokens, nTokens, limitTokens);
+						}
+
+						// get size of token
+						size = sizeof(mathsolver_token);
+						token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= ClosingParentheses;
+							token->size = size;
+
+							// insert cpar op at close index + 1 (since prev insert shifted this index) and shift tokens
+							nTokens = mathsolver_insert_token(token, closeIndex + 1, tokens, nTokens, limitTokens);
+						}
+
+						i++;
+					}
+					break;
+				}
+				}
+			}
+		}
+	}
+
+	// double token pass
+	for (int i = 0; i < nTokens && i < limitTokens; i++)
+	{
+		if (!(flags & MATHSOLVER_STANDARDIZE_FLAG_IMPLICIT_ORDER_OF_OPERATIONS))
+		{
+			// explicitly state order of operations
+			// 3*1/1+2 becomes ((3*1)/1)+2
+			if (tokens[i]->type == Operator)
+			{
+				switch (tokens[i]->operator)
+				{
+				case Sub:
+				{
+					// explicitly state negate operator
+					// -(x+2) becomes (-(x+2))
+					// Note: ONLY if nothing or ( to the left
+					if (i < nTokens - 1 && i < limitTokens - 1)
+					{
+						int openIndex = -1;
+						if (i == 0 || (i > 0 && tokens[i - 1]->type == Operator && tokens[i - 1]->operator != ClosingParentheses))
+						{
+							openIndex = i;
+						}
+						else
+						{
+							break;
+						}
+
+						int closeIndex = i + 1;
+
+						if (tokens[i + 1]->type != Operator)
+						{
+							closeIndex = i + 2;
+						}
+						else if (tokens[i + 1]->operator == OpeningParentheses)
+						{
+							// search right for closing parentheses with same relative depth
+							int depth = 0;
+							for (int j = i + 2; j < nTokens && j < limitTokens; j++)
+							{
+								if (tokens[j]->type == Operator)
+								{
+									if (tokens[j]->operator == OpeningParentheses)
+									{
+										depth++;
+									}
+									else if (tokens[j]->operator == ClosingParentheses)
+									{
+										if (depth == 0)
+										{
+											closeIndex = j + 1;
+											break;
+										}
+										else
+										{
+											depth--;
+										}
+									}
+								}
+							}
+						}
+
+						// get size of token
+						int size = sizeof(mathsolver_token);
+						mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= OpeningParentheses;
+							token->size = size;
+
+							// insert opar op at open index and shift tokens
+							nTokens = mathsolver_insert_token(token, openIndex, tokens, nTokens, limitTokens);
+						}
+
+						// get size of token
+						size = sizeof(mathsolver_token);
+						token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= ClosingParentheses;
+							token->size = size;
+
+							// insert cpar op at close index + 1 (since prev insert shifted this index) and shift tokens
+							nTokens = mathsolver_insert_token(token, closeIndex + 1, tokens, nTokens, limitTokens);
+						}
+
+						i++;
+					}
+					break;
+				}
+				}
+			}
+		}
+	}
+
+	// triple token pass
+	for (int i = 0; i < nTokens && i < limitTokens; i++)
+	{
+		if (!(flags & MATHSOLVER_STANDARDIZE_FLAG_IMPLICIT_ORDER_OF_OPERATIONS))
+		{
+			// explicitly state order of operations
+			// 3*1/1+2 becomes ((3*1)/1)+2
+			if (tokens[i]->type == Operator)
 			{
 				switch (tokens[i]->operator)
 				{
@@ -677,10 +878,6 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 							i++;
 						}
 					}
-					break;
-				}
-				case Factorial:
-				{
 					break;
 				}
 				}
@@ -1098,6 +1295,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 	mathsolver_expression* expression = malloc(sizeof(mathsolver_expression));
 	expression->parent = NULL;
 	expression->nodes = NULL;
+	expression->copy_of = NULL;
 	if (expression == NULL)
 		return NULL;
 
@@ -1182,21 +1380,25 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 				if (currentInst == NULL)
 					return NULL;
 				currentInst->parent = tmp;
+				currentInst->copy_of = NULL;
 
-				if (childCount >= childListSize)
+				if (tmp->instruction != iFactorial)
 				{
-					mathsolver_expression** rel = realloc(childList, sizeof(mathsolver_expression*) * childListSize * 2);
-					if (rel != NULL)
+					if (childCount >= childListSize)
 					{
-						childList = rel;
-						childListSize = childListSize * 2;
+						mathsolver_expression** rel = realloc(childList, sizeof(mathsolver_expression*) * childListSize * 2);
+						if (rel != NULL)
+						{
+							childList = rel;
+							childListSize = childListSize * 2;
+						}
+						else
+						{
+							return NULL;
+						}
 					}
-					else
-					{
-						return NULL;
-					}
+					childList[childCount++] = currentInst;
 				}
-				childList[childCount++] = currentInst;
 
 				tmp->node_count = childCount;
 				tmp->nodes = childList;
@@ -1291,19 +1493,22 @@ mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_express
 		case expNumber:
 		{
 			token->type = Number;
-			char* buf = malloc(sizeof(char) * 64);
+			char* buf = malloc(sizeof(char) * 256);
 			if (buf == NULL)
 				return NULL;
-			snprintf(buf, 64, "%f", expression->number);
+			snprintf(buf, 256, "%f", expression->number);
 			int len = (int)strlen(buf);
 			char* ptr = buf + len - 1;
 			if (strchr(buf, '.') != NULL)
 			{
 				while (*ptr == '0' || *ptr == '.' /* decimal */)
 				{
+					char p = *ptr;
 					*ptr = '\0';
 					ptr--;
 					len--;
+					if (p == '.')
+						break;
 				}
 			}
 			token->number = buf;
@@ -1333,7 +1538,7 @@ mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_express
 
 		for (int i = 0; i < expression->node_count; i++)
 		{
-			if (i == 0)
+			if (i == 0 && expression->instruction != iNeg)
 			{
 				mathsolver_inflated_tokens* child = mathsolver_from_expression_parent(expression->nodes[0], tokens);
 				tokens->children[0] = child;
@@ -1390,6 +1595,32 @@ mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_express
 				childOp->token = token;
 				tokens->children[1] = childOp;
 			}
+			else if (i == 0)
+			{
+				mathsolver_inflated_tokens* child = mathsolver_from_expression_parent(expression->nodes[0], tokens);
+				tokens->children[1] = child;
+
+				mathsolver_inflated_tokens* childOp = malloc(sizeof(mathsolver_inflated_tokens));
+				if (childOp == NULL)
+					return NULL;
+				childOp->parent = child->parent;
+				childOp->initialized = 1;
+				childOp->depth = child->depth;
+				childOp->type = Token;
+
+				mathsolver_token* token = malloc(sizeof(mathsolver_token));
+				if (token == NULL)
+					return NULL;
+				token->type = Operator;
+				switch (expression->instruction)
+				{
+				case iNeg:
+					token->operator = Sub;
+					break;
+				}
+				childOp->token = token;
+				tokens->children[0] = childOp;
+			}
 			else
 			{
 				mathsolver_inflated_tokens* child = mathsolver_from_expression_parent(expression->nodes[i], tokens);
@@ -1405,4 +1636,198 @@ mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_express
 mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression)
 {
 	return mathsolver_from_expression_parent(expression, NULL);
+}
+
+mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
+{
+	if (expression->type == expNumber)
+	{
+		return expression;
+	}
+	else if (expression->type == expVariable)
+	{
+		// convert var into new number expression if defined
+		mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+		if (exp == NULL)
+			return expression;
+
+		exp->type = expNumber;
+		exp->parent = expression->parent;
+		exp->number = 12.34;
+		exp->copy_of = expression;
+		return exp;
+	}
+	else
+	{
+		// evaluate instruction
+		switch (expression->instruction)
+		{
+		case iAdd:
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+
+				if (left->type == expNumber && right->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = left->number + right->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iSub:
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+
+				if (left->type == expNumber && right->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = left->number - right->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iNeg:
+		{
+			if (expression->node_count == 1)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+
+				if (left->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = -left->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iMul:
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+
+				if (left->type == expNumber && right->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = left->number * right->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iDiv:
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+
+				if (left->type == expNumber && right->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = left->number / right->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iFactorial:
+		{
+			if (expression->node_count == 1)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+
+				if (left->type == expNumber)
+				{
+					if (!is_integer(left->number) || left->number < 0) // factorial requires whole integers
+						return expression;
+
+					double out = 1;
+					for (double v = 1; v <= left->number; v++)
+					{
+						out *= v;
+					}
+
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = out;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		}
+		return expression;
+	}
 }
