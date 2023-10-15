@@ -5,6 +5,10 @@ set(CMAKE_C_STANDARD 11)
 
 # library
 add_library(math_solver STATIC src/mathsolver.c)
+find_library(MATH_LIBRARY m)
+if(MATH_LIBRARY)
+    target_link_libraries(math_solver PUBLIC ${MATH_LIBRARY})
+endif()
 
 # main code
 add_executable(main src/main.c)
