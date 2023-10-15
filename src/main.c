@@ -228,6 +228,19 @@ int main()
 	printf("Instruction expression:\n");
 	printExpression(expression, 0);
 
+	mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(expression);
+	printf("Inflated out:\n");
+	printInflatedTokens(inflatedOut);
+
+	mathsolver_token* tokensOut[64];
+	int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
+	mathsolver_format(output, 256, tokensOut, countOut);
+	printf("Deflated: %s\n", output);
+
+	countOut = mathsolver_reduce(tokensOut, countOut);
+	mathsolver_format(output, 256, tokensOut, countOut);
+	printf("Expression out: %s\n", output);
+
 	mathsolver_expression_free(&expression);
 	mathsolver_inflated_tokens_free(&inflated);
 	for (int i = 0; i < count; i++)

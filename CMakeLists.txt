@@ -181,12 +181,12 @@ add_test(
   COMMAND $<TARGET_FILE:inflate_round>
 )
 
-# to_expression
-add_executable(to_expression tests/to_expression.c)
-target_link_libraries(to_expression PRIVATE math_solver)
+# expression_round
+add_executable(expression_round tests/expression_round.c)
+target_link_libraries(expression_round PRIVATE math_solver)
 add_test(
-  NAME to_expression
-  COMMAND $<TARGET_FILE:to_expression>
+  NAME expression_round
+  COMMAND $<TARGET_FILE:expression_round>
 )
 
 target_include_directories(math_solver PUBLIC

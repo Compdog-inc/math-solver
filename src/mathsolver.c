@@ -1170,7 +1170,140 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 	return expression;
 }
 
+mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_expression* expression, mathsolver_inflated_tokens* parent)
+{
+	mathsolver_inflated_tokens* tokens = malloc(sizeof(mathsolver_inflated_tokens));
+	if (tokens == NULL)
+		return NULL;
+	tokens->parent = parent;
+	tokens->initialized = 0;
+	tokens->depth = parent != NULL ? parent->depth + 1 : 0;
+
+	if (expression->type != expInstruction)
+	{
+		tokens->type = Token;
+		tokens->initialized = 1;
+		mathsolver_token* token = malloc(sizeof(mathsolver_token));
+		if (token == NULL)
+			return NULL;
+
+		switch (expression->type)
+		{
+		case expNumber:
+		{
+			token->type = Number;
+			char* buf = malloc(sizeof(char) * 64);
+			if (buf == NULL)
+				return NULL;
+			snprintf(buf, 64, "%f", expression->number);
+			int len = (int)strlen(buf);
+			char* ptr = buf + len - 1;
+			if (strchr(buf, '.') != NULL)
+			{
+				while (*ptr == '0' || *ptr == '.' /* decimal */)
+				{
+					*ptr = '\0';
+					ptr--;
+					len--;
+				}
+			}
+			token->number = buf;
+			token->size = len;
+			break;
+		}
+		case expVariable:
+		{
+			token->type = Variable;
+			token->size = expression->variable_length;
+			token->variable = expression->variable;
+			break;
+		}
+		}
+
+		tokens->token = token;
+	}
+	else
+	{
+		tokens->initialized = 1;
+		tokens->type = InflatedList;
+		tokens->children = malloc(sizeof(mathsolver_inflated_tokens*) * (expression->node_count+1)); // make room for operator token
+		if (tokens->children == NULL)
+			return NULL;
+		tokens->children_count = expression->node_count+1;
+		tokens->max_count = expression->node_count+1;
+
+		for (int i = 0; i < expression->node_count; i++)
+		{
+			if (i == 0)
+			{
+				mathsolver_inflated_tokens* child = mathsolver_from_expression_parent(expression->nodes[0], tokens);
+				tokens->children[0] = child;
+
+				mathsolver_inflated_tokens* childOp = malloc(sizeof(mathsolver_inflated_tokens));
+				if (childOp == NULL)
+					return NULL;
+				childOp->parent = child->parent;
+				childOp->initialized = 1;
+				childOp->depth = child->depth;
+				childOp->type = Token;
+
+				mathsolver_token* token = malloc(sizeof(mathsolver_token));
+				if (token == NULL)
+					return NULL;
+				token->type = Operator;
+				switch (expression->instruction)
+				{
+				case iAdd:
+					token->operator = Add;
+					break;
+				case iSub:
+				case iNeg:
+					token->operator = Sub;
+					break;
+				case iMul:
+					token->operator = Mul;
+					break;
+				case iDiv:
+					token->operator = Div;
+					break;
+				case iEq:
+					token->operator = EQ;
+					break;
+				case iGt:
+					token->operator = GT;
+					break;
+				case iLt:
+					token->operator = LT;
+					break;
+				case iGe:
+					token->operator = GE;
+					break;
+				case iLe:
+					token->operator = LE;
+					break;
+				case iNeq:
+					token->operator = NEQ;
+					break;
+				case iFactorial:
+					token->operator = Factorial;
+					break;
+				}
+				childOp->token = token;
+				tokens->children[1] = childOp;
+			}
+			else
+			{
+				mathsolver_inflated_tokens* child = mathsolver_from_expression_parent(expression->nodes[i], tokens);
+				child->parent = tokens;
+				tokens->children[i + 1] = child;
+			}
+		}
+	}
+
+	return tokens;
+}
+
 mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression)
 {
-
+	return mathsolver_from_expression_parent(expression, NULL);
 }

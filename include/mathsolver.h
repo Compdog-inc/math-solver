@@ -6,6 +6,7 @@
 #include <malloc.h>
 #include <memory.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 typedef enum
 {
