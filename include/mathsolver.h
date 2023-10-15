@@ -30,7 +30,8 @@ typedef enum
 	NEQ,
 	OpeningParentheses,
 	ClosingParentheses,
-	Factorial
+	Factorial,
+	Exponent
 } mathsolver_operator;
 
 typedef struct
@@ -89,7 +90,8 @@ typedef enum
 	iGe,
 	iLe,
 	iNeq,
-	iFactorial
+	iFactorial,
+	iExponent
 } mathsolver_instruction;
 
 typedef struct _mathsolver_expression

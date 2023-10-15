@@ -87,6 +87,11 @@ void printToken(mathsolver_token* token)
 			printf("!");
 			break;
 		}
+		case Exponent:
+		{
+			printf("^");
+			break;
+		}
 		}
 		break;
 	}
@@ -163,6 +168,11 @@ void printInstruction(mathsolver_instruction instr)
 		printf("fac");
 		break;
 	}
+	case iExponent:
+	{
+		printf("exp");
+		break;
+	}
 	}
 }
 
@@ -214,7 +224,7 @@ int main()
 		printf("Enter expression:\n");
 
 		char str[256];
-		if (gets_s(str, 256) == NULL)
+		if (fgets(str, 256, stdin) == NULL)
 			return 1;
 
 		mathsolver_token* tokens[64];
