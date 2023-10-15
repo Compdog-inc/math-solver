@@ -337,6 +337,21 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens)
 			}
 			break;
 		}
+		case '^':
+		{
+			// get size of token
+			int size = sizeof(mathsolver_token);
+			mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+			if (token != NULL)
+			{
+				// create token
+				token->type = Operator;
+				token->operator= Exponent;
+				token->size = size;
+				queuedToken = token;
+			}
+			break;
+		}
 		default:
 		{
 			if (!inSubscript && *str == '_' && *(str + 1) == '{')
@@ -491,6 +506,10 @@ int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int 
 			case Factorial:
 				if (ind < sOutput - 2) // null terminator + one less
 					output[ind++] = '!';
+				break;
+			case Exponent:
+				if (ind < sOutput - 2) // null terminator + one less
+					output[ind++] = '^';
 				break;
 			}
 		}
@@ -648,6 +667,121 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 
 						i++;
 					}
+					break;
+				}
+				case Exponent:
+				{
+					if (i < nTokens - 1 && i < limitTokens - 1)
+					{
+						// prevent unnecessary parentheses ((1*1))
+						if (!(i > 1 && i < nTokens - 2 && i < limitTokens - 2 &&
+							tokens[i - 1]->type != Operator &&
+							tokens[i + 1]->type != Operator &&
+							tokens[i - 2]->type == Operator &&
+							tokens[i - 2]->operator == OpeningParentheses &&
+							tokens[i + 2]->type == Operator &&
+							tokens[i + 2]->operator == ClosingParentheses
+							))
+						{
+							int openIndex = i - 1;
+							int closeIndex = i + 1;
+
+							if (tokens[i - 1]->type != Operator)
+							{
+								openIndex = i - 1;
+							}
+							else if (tokens[i - 1]->operator == ClosingParentheses)
+							{
+								// search left for opening parentheses with same relative depth
+								int depth = 0;
+								for (int j = i - 2; j >= 0; j--)
+								{
+									if (tokens[j]->type == Operator)
+									{
+										if (tokens[j]->operator == ClosingParentheses)
+										{
+											depth++;
+										}
+										else if (tokens[j]->operator == OpeningParentheses)
+										{
+											if (depth == 0)
+											{
+												openIndex = j;
+												break;
+											}
+											else
+											{
+												depth--;
+											}
+										}
+									}
+								}
+							}
+
+							if (tokens[i + 1]->type != Operator)
+							{
+								closeIndex = i + 2;
+							}
+							else if (tokens[i + 1]->operator == OpeningParentheses)
+							{
+								// search right for closing parentheses with same relative depth
+								int depth = 0;
+								for (int j = i + 2; j < nTokens && j < limitTokens; j++)
+								{
+									if (tokens[j]->type == Operator)
+									{
+										if (tokens[j]->operator == OpeningParentheses)
+										{
+											depth++;
+										}
+										else if (tokens[j]->operator == ClosingParentheses)
+										{
+											if (depth == 0)
+											{
+												closeIndex = j + 1;
+												break;
+											}
+											else
+											{
+												depth--;
+											}
+										}
+									}
+								}
+							}
+
+							// get size of token
+							int size = sizeof(mathsolver_token);
+							mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+							if (token != NULL)
+							{
+								// create token
+								token->type = Operator;
+								token->operator= OpeningParentheses;
+								token->size = size;
+
+								// insert opar op at open index and shift tokens
+								nTokens = mathsolver_insert_token(token, openIndex, tokens, nTokens, limitTokens);
+							}
+
+							// get size of token
+							size = sizeof(mathsolver_token);
+							token = (mathsolver_token*)malloc(size); // allocate
+							if (token != NULL)
+							{
+								// create token
+								token->type = Operator;
+								token->operator= ClosingParentheses;
+								token->size = size;
+
+								// insert cpar op at close index + 1 (since prev insert shifted this index) and shift tokens
+								nTokens = mathsolver_insert_token(token, closeIndex + 1, tokens, nTokens, limitTokens);
+							}
+
+							i++;
+						}
+					}
+
 					break;
 				}
 				}
@@ -1372,6 +1506,9 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 				case Factorial:
 					currentInst->instruction = iFactorial;
 					break;
+				case Exponent:
+					currentInst->instruction = iExponent;
+					break;
 				}
 
 				mathsolver_expression* tmp = currentInst;
@@ -1591,6 +1728,9 @@ mathsolver_inflated_tokens* mathsolver_from_expression_parent(mathsolver_express
 				case iFactorial:
 					token->operator = Factorial;
 					break;
+				case iExponent:
+					token->operator = Exponent;
+					break;
 				}
 				childOp->token = token;
 				tokens->children[1] = childOp;
@@ -1782,6 +1922,33 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 					exp->type = expNumber;
 					exp->parent = expression->parent;
 					exp->number = left->number / right->number;
+					exp->copy_of = expression;
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+			}
+			break;
+		}
+		case iExponent:
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+
+				if (left->type == expNumber && right->type == expNumber)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expNumber;
+					exp->parent = expression->parent;
+					exp->number = pow(left->number, right->number);
 					exp->copy_of = expression;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
