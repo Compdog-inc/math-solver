@@ -117,6 +117,7 @@ int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens);
 int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
 
 int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens);
+int mathsolver_reduce(mathsolver_token** tokens, int nTokens);
 
 mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nTokens);
 int mathsolver_count_inflated(mathsolver_inflated_tokens* tokens);

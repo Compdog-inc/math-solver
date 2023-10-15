@@ -501,6 +501,16 @@ int mathsolver_insert_token(mathsolver_token* token, int index, mathsolver_token
 	return nTokens;
 }
 
+int mathsolver_remove_token(int index, mathsolver_token** tokens, int nTokens)
+{
+	nTokens--;
+	for (int i = index; i < nTokens; i++)
+	{
+		tokens[i] = tokens[i + 1];
+	}
+	return nTokens;
+}
+
 int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens)
 {
 	for (int i = 0; i < nTokens; i++)
@@ -528,6 +538,27 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 				// insert Mul op at current index and shift tokens
 				nTokens = mathsolver_insert_token(token, i, tokens, nTokens, limitTokens);
 			}
+		}
+	}
+
+	return nTokens;
+}
+
+int mathsolver_reduce(mathsolver_token** tokens, int nTokens)
+{
+	for (int i = 0; i < nTokens; i++)
+	{
+		// reduce implicit multiplication
+		// [not-op]*[var] or [not-op]*[opar]
+		// for example: 3*x, y*x, 3*(, x*(
+		if (
+			i > 0 && i < nTokens - 1 && tokens[i]->type == Operator && tokens[i]->operator == Mul && (
+				(tokens[i - 1]->type != Operator && tokens[i + 1]->type == Variable) ||
+				(tokens[i - 1]->type != Operator && tokens[i + 1]->type == Operator && tokens[i + 1]->operator == OpeningParentheses)
+				)
+			)
+		{
+			nTokens = mathsolver_remove_token(i-- /* remove already increments index position */, tokens, nTokens);
 		}
 	}
 

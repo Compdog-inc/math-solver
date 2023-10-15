@@ -157,6 +157,14 @@ add_test(
   COMMAND $<TARGET_FILE:standardize_implicit_mul>
 )
 
+# reduce_implicit_mul
+add_executable(reduce_implicit_mul tests/reduce_implicit_mul.c)
+target_link_libraries(reduce_implicit_mul PRIVATE math_solver)
+add_test(
+  NAME reduce_implicit_mul
+  COMMAND $<TARGET_FILE:reduce_implicit_mul>
+)
+
 # inflate_depth
 add_executable(inflate_depth tests/inflate_depth.c)
 target_link_libraries(inflate_depth PRIVATE math_solver)
