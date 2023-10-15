@@ -693,7 +693,106 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 
 int mathsolver_reduce(mathsolver_token** tokens, int nTokens)
 {
-	for (int i = 0; i < nTokens; i++)
+	for (int i = nTokens - 1; i >= 0; i--)
+	{
+		// reduce explicitly stated order of operations
+		// ((3*1)/1)+2 becomes 3*1/1+2 but (3*(1+2)) becomes 3*(1+2)
+		if (i > 0 && tokens[i]->type == Operator)
+		{
+			switch (tokens[i]->operator)
+			{
+			case Mul:
+			case Div:
+			{
+				// prevent reducing no parentheses _1*1_ -> 1*1
+				if (i > 1 && i < nTokens - 2)
+				{
+					int openIndex = -1;
+					int closeIndex = -1;
+
+					if (tokens[i - 1]->type != Operator && tokens[i - 2]->type == Operator && tokens[i - 2]->operator == OpeningParentheses)
+					{
+						openIndex = i - 2;
+					}
+					else if (tokens[i - 1]->operator == ClosingParentheses)
+					{
+						// search left for opening parentheses with same relative depth
+						int depth = 0;
+						for (int j = i - 2; j >= 0; j--)
+						{
+							if (tokens[j]->type == Operator)
+							{
+								if (tokens[j]->operator == ClosingParentheses)
+								{
+									depth++;
+								}
+								else if (tokens[j]->operator == OpeningParentheses)
+								{
+									if (depth == -1)
+									{
+										openIndex = j;
+										break;
+									}
+									else
+									{
+										depth--;
+									}
+								}
+							}
+						}
+					}
+
+					if (tokens[i + 1]->type != Operator && tokens[i + 2]->type == Operator && tokens[i + 2]->operator == ClosingParentheses)
+					{
+						closeIndex = i + 2;
+					}
+					else if (tokens[i + 1]->operator == OpeningParentheses)
+					{
+						// search right for closing parentheses with same relative depth
+						int depth = 0;
+						for (int j = i + 2; j < nTokens; j++)
+						{
+							if (tokens[j]->type == Operator)
+							{
+								if (tokens[j]->operator == OpeningParentheses)
+								{
+									depth++;
+								}
+								else if (tokens[j]->operator == ClosingParentheses)
+								{
+									if (depth == -1)
+									{
+										closeIndex = j;
+										break;
+									}
+									else
+									{
+										depth--;
+									}
+								}
+							}
+						}
+					}
+
+					if (closeIndex != -1 && openIndex != -1)
+					{
+						nTokens = mathsolver_remove_token(closeIndex, tokens, nTokens);
+						nTokens = mathsolver_remove_token(openIndex, tokens, nTokens);
+						i--;
+					}
+				}
+				break;
+			}
+			case Factorial:
+			{
+				break;
+			}
+			}
+		}
+	}
+
+	// second pass because implicit order of operations reduces from both sides
+	for (int i = nTokens - 1; i >= 0; i--)
 	{
 		// reduce implicit multiplication
 		// [not-op]*[var] or [not-op]*[opar]
@@ -705,7 +804,7 @@ int mathsolver_reduce(mathsolver_token** tokens, int nTokens)
 				)
 			)
 		{
-			nTokens = mathsolver_remove_token(i-- /* remove already increments index position */, tokens, nTokens);
+			nTokens = mathsolver_remove_token(i, tokens, nTokens);
 		}
 	}
 
