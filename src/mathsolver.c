@@ -32,6 +32,21 @@ void mathsolver_inflated_tokens_free(mathsolver_inflated_tokens** tokens)
 	*tokens = NULL;
 }
 
+void mathsolver_expression_free(mathsolver_expression** expression)
+{
+	if ((*expression)->type == expInstruction)
+	{
+		for (int i = 0; i < (*expression)->node_count; i++)
+		{
+			mathsolver_expression_free(&((*expression)->nodes[i]));
+		}
+		free((*expression)->nodes);
+	}
+
+	free(*expression);
+	*expression = NULL;
+}
+
 uint8_t is_numeric(char ch, char hintPrev, char hintNext)
 {
 	/*
@@ -490,8 +505,8 @@ int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int 
 
 int mathsolver_insert_token(mathsolver_token* token, int index, mathsolver_token** tokens, int nTokens, int limitTokens)
 {
-	nTokens++;
-	if (nTokens <= limitTokens) {
+	if (nTokens < limitTokens) {
+		nTokens++;
 		for (int i = nTokens; i > index; i--)
 		{
 			tokens[i] = tokens[i - 1];
@@ -511,18 +526,19 @@ int mathsolver_remove_token(int index, mathsolver_token** tokens, int nTokens)
 	return nTokens;
 }
 
-int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens)
+int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens, uint8_t flags)
 {
-	for (int i = 0; i < nTokens; i++)
+	for (int i = 0; i < nTokens && i < limitTokens; i++)
 	{
 		// check for implicit multiplication
-		// [not-op][var] or [var][not-op] or [not-op][opar] or [cpar][not-op]
-		// for example: 3x, yx, x3[x], xy[x], 3(, x(, )3[x], )x
+		// [not-op][var] or [var][not-op] or [not-op][opar] or [cpar][not-op] or [cpar][opar]
+		// for example: 3x, yx, x3[x], xy[x], 3(, x(, )3[x], )x, )(
 		if (
 			(i > 0 && tokens[i]->type == Variable && tokens[i - 1]->type != Operator) ||
 			(i > 0 && tokens[i]->type != Operator && tokens[i - 1]->type == Variable) ||
 			(i > 0 && tokens[i]->type == Operator && tokens[i]->operator == OpeningParentheses && tokens[i - 1]->type != Operator) ||
-			(i > 0 && tokens[i]->type != Operator && tokens[i - 1]->type == Operator && tokens[i - 1]->operator == ClosingParentheses)
+			(i > 0 && tokens[i]->type != Operator && tokens[i - 1]->type == Operator && tokens[i - 1]->operator == ClosingParentheses) ||
+			(i > 0 && tokens[i]->type == Operator && tokens[i]->operator == OpeningParentheses && tokens[i - 1]->type == Operator && tokens[i - 1]->operator == ClosingParentheses)
 			)
 		{
 			// get size of token
@@ -537,6 +553,137 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 
 				// insert Mul op at current index and shift tokens
 				nTokens = mathsolver_insert_token(token, i, tokens, nTokens, limitTokens);
+			}
+		}
+
+		if (!(flags & MATHSOLVER_STANDARDIZE_FLAG_IMPLICIT_ORDER_OF_OPERATIONS))
+		{
+			// explicitly state order of operations
+			// 3*1/1+2 becomes ((3*1)/1)+2
+			if (i > 0 && tokens[i]->type == Operator)
+			{
+				switch (tokens[i]->operator)
+				{
+				case Mul:
+				case Div:
+				{
+					if (i < nTokens - 1 && i < limitTokens - 1)
+					{
+						// prevent unnecessary parentheses ((1*1))
+						if (!(i > 1 && i < nTokens - 2 && i < limitTokens - 2 &&
+							tokens[i - 1]->type != Operator &&
+							tokens[i + 1]->type != Operator &&
+							tokens[i - 2]->type == Operator &&
+							tokens[i - 2]->operator == OpeningParentheses &&
+							tokens[i + 2]->type == Operator &&
+							tokens[i + 2]->operator == ClosingParentheses
+							))
+						{
+							int openIndex = i - 1;
+							int closeIndex = i + 1;
+
+							if (tokens[i - 1]->type != Operator)
+							{
+								openIndex = i - 1;
+							}
+							else if (tokens[i - 1]->operator == ClosingParentheses)
+							{
+								// search left for opening parentheses with same relative depth
+								int depth = 0;
+								for (int j = i - 2; j >= 0; j--)
+								{
+									if (tokens[j]->type == Operator)
+									{
+										if (tokens[j]->operator == ClosingParentheses)
+										{
+											depth++;
+										}
+										else if (tokens[j]->operator == OpeningParentheses)
+										{
+											if (depth == 0)
+											{
+												openIndex = j;
+												break;
+											}
+											else
+											{
+												depth--;
+											}
+										}
+									}
+								}
+							}
+
+							if (tokens[i + 1]->type != Operator)
+							{
+								closeIndex = i + 2;
+							}
+							else if (tokens[i + 1]->operator == OpeningParentheses)
+							{
+								// search right for closing parentheses with same relative depth
+								int depth = 0;
+								for (int j = i + 2; j < nTokens && j < limitTokens; j++)
+								{
+									if (tokens[j]->type == Operator)
+									{
+										if (tokens[j]->operator == OpeningParentheses)
+										{
+											depth++;
+										}
+										else if (tokens[j]->operator == ClosingParentheses)
+										{
+											if (depth == 0)
+											{
+												closeIndex = j + 1;
+												break;
+											}
+											else
+											{
+												depth--;
+											}
+										}
+									}
+								}
+							}
+
+							// get size of token
+							int size = sizeof(mathsolver_token);
+							mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+							if (token != NULL)
+							{
+								// create token
+								token->type = Operator;
+								token->operator= OpeningParentheses;
+								token->size = size;
+
+								// insert opar op at open index and shift tokens
+								nTokens = mathsolver_insert_token(token, openIndex, tokens, nTokens, limitTokens);
+							}
+
+							// get size of token
+							size = sizeof(mathsolver_token);
+							token = (mathsolver_token*)malloc(size); // allocate
+							if (token != NULL)
+							{
+								// create token
+								token->type = Operator;
+								token->operator= ClosingParentheses;
+								token->size = size;
+
+								// insert cpar op at close index + 1 (since prev insert shifted this index) and shift tokens
+								nTokens = mathsolver_insert_token(token, closeIndex + 1, tokens, nTokens, limitTokens);
+							}
+
+							i++;
+						}
+					}
+					break;
+				}
+				case Factorial:
+				{
+					break;
+				}
+				}
 			}
 		}
 	}
@@ -591,7 +738,7 @@ mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nT
 				{
 					currentChild->initialized = 1;
 					currentChild->children_count = 0;
-					currentChild->max_count = tind;
+					currentChild->max_count = tind+1;
 					currentChild->children = malloc(sizeof(mathsolver_inflated_tokens*) * currentChild->max_count);
 				}
 				for (int j = 0; j < tind; j++)
@@ -642,7 +789,10 @@ mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nT
 							return NULL;
 						}
 					}
-					tmp->children[tmp->children_count++] = currentChild;
+					if (tmp->children != NULL)
+					{
+						tmp->children[tmp->children_count++] = currentChild;
+					}
 				}
 				else
 				{
@@ -844,18 +994,183 @@ int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** de
 	return mathsolver_copy_tokens(tokens, deflated, 0, sDeflated);
 }
 
-mathsolver_expression* mathsolver_to_expression(mathsolver_token** tokens, int nTokens)
+mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens)
 {
-	for (int i = 0; i < nTokens; i++)
-	{
-		if (tokens[i]->type == Operator)
-		{
+	mathsolver_expression* expression = malloc(sizeof(mathsolver_expression));
+	expression->parent = NULL;
+	expression->nodes = NULL;
+	if (expression == NULL)
+		return NULL;
 
+	if (tokens->type == Token)
+	{
+		switch (tokens->token->type)
+		{
+		case Number:
+			expression->type = expNumber;
+			expression->number = atof(tokens->token->number);
+			break;
+		case Variable:
+			expression->type = expVariable;
+			expression->variable = tokens->token->variable;
+			expression->variable_length = tokens->token->size;
+			break;
 		}
 	}
+	else
+	{
+		int childListSize = 2;
+		mathsolver_expression** childList = malloc(sizeof(mathsolver_expression*) * childListSize);
+		if (childList == NULL)
+			return NULL;
+		int childCount = 0;
+
+		mathsolver_expression* currentInst = expression;
+
+		for (int i = 0; i < tokens->children_count; i++)
+		{
+			// parsing: left to right (3*5+x is mul(3,add(5,x)))
+			// Note: since input is expected to be standardized, order of operations is preserved
+			if (tokens->children[i]->type == Token && tokens->children[i]->token->type == Operator)
+			{
+				currentInst->type = expInstruction;
+				switch (tokens->children[i]->token->operator)
+				{
+				case Add:
+					currentInst->instruction = iAdd;
+					break;
+				case Sub:
+				{
+					// if nothing before sub, then negate
+					if (childCount == 0) // since parsing is left to right
+						currentInst->instruction = iNeg;
+					else
+						currentInst->instruction = iSub;
+				}
+				break;
+				case Mul:
+					currentInst->instruction = iMul;
+					break;
+				case Div:
+					currentInst->instruction = iDiv;
+					break;
+				case EQ:
+					currentInst->instruction = iEq;
+					break;
+				case GT:
+					currentInst->instruction = iGt;
+					break;
+				case LT:
+					currentInst->instruction = iLt;
+					break;
+				case GE:
+					currentInst->instruction = iGe;
+					break;
+				case LE:
+					currentInst->instruction = iLe;
+					break;
+				case NEQ:
+					currentInst->instruction = iNeq;
+					break;
+				case Factorial:
+					currentInst->instruction = iFactorial;
+					break;
+				}
+
+				mathsolver_expression* tmp = currentInst;
+
+				currentInst = malloc(sizeof(mathsolver_expression));
+				if (currentInst == NULL)
+					return NULL;
+				currentInst->parent = tmp;
+
+				if (childCount >= childListSize)
+				{
+					mathsolver_expression** rel = realloc(childList, sizeof(mathsolver_expression*) * childListSize * 2);
+					if (rel != NULL)
+					{
+						childList = rel;
+						childListSize = childListSize * 2;
+					}
+					else
+					{
+						return NULL;
+					}
+				}
+				childList[childCount++] = currentInst;
+
+				tmp->node_count = childCount;
+				tmp->nodes = childList;
+
+				// reset child list
+				childListSize = 2;
+				childList = malloc(sizeof(mathsolver_expression*) * childListSize);
+				if (childList == NULL)
+					return NULL;
+				childCount = 0;
+			}
+			else
+			{
+				mathsolver_expression* child = mathsolver_to_expression(tokens->children[i]);
+				if (childCount >= childListSize)
+				{
+					mathsolver_expression** rel = realloc(childList, sizeof(mathsolver_expression*) * childListSize * 2);
+					if (rel != NULL)
+					{
+						childList = rel;
+						childListSize = childListSize * 2;
+					}
+					else
+					{
+						return NULL;
+					}
+				}
+				childList[childCount++] = child;
+			}
+		}
+
+		if (currentInst->parent != NULL && childCount > 0)
+		{
+			mathsolver_expression** rel = realloc(currentInst->parent->nodes, sizeof(mathsolver_expression*) * (currentInst->parent->node_count - 1 + childCount));
+			if (rel != NULL)
+			{
+				currentInst->parent->nodes = rel;
+				currentInst->parent->node_count = currentInst->parent->node_count - 1 + childCount;
+			}
+			else
+			{
+				return NULL;
+			}
+
+			// copy leftover children to parent of arg expression
+			memcpy(currentInst->parent->nodes + currentInst->parent->node_count - childCount, childList, sizeof(mathsolver_expression*) * childCount);
+		}
+		else if (childCount == 1)
+		{
+			// only possible to have root expression with one child
+			currentInst->type = childList[0]->type;
+			switch (currentInst->type)
+			{
+			case expNumber:
+				currentInst->number = childList[0]->number;
+				break;
+			case expVariable:
+				currentInst->variable = childList[0]->variable;
+				currentInst->variable_length = childList[0]->variable_length;
+				break;
+			case expInstruction:
+				currentInst->instruction = childList[0]->instruction;
+				currentInst->nodes = childList[0]->nodes;
+				currentInst->node_count = childList[0]->node_count;
+				break;
+			}
+		}
+	}
+
+	return expression;
 }
 
-int mathsolver_from_expression(mathsolver_expression* expression, mathsolver_token** tokens, int nTokens)
+mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression)
 {
 
 }

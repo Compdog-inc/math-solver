@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <memory.h>
+#include <stdlib.h>
 
 typedef enum
 {
@@ -95,7 +96,11 @@ typedef struct _mathsolver_expression
 	union
 	{
 		double number;
-		char* variable;
+		struct
+		{
+			char* variable;
+			int variable_length;
+		};
 		struct
 		{
 			struct _mathsolver_expression** nodes;
@@ -103,11 +108,13 @@ typedef struct _mathsolver_expression
 			mathsolver_instruction instruction;
 		};
 	};
+	struct _mathsolver_expression* parent;
 } mathsolver_expression;
 
 void mathsolver_token_free(mathsolver_token** token);
 // Note: Does not free the underlying mathsolver_token* pointer or parent, only the children arrays and children inflated tokens + struct pointers
 void mathsolver_inflated_tokens_free(mathsolver_inflated_tokens** tokens);
+void mathsolver_expression_free(mathsolver_expression** expression);
 
 uint8_t is_numeric(char ch, char hintPrev, char hintNext);
 uint8_t is_alphabetic(char ch);
@@ -116,7 +123,9 @@ uint8_t is_whitespace(char ch);
 int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens);
 int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
 
-int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens);
+#define MATHSOLVER_STANDARDIZE_FLAG_NONE 0
+#define MATHSOLVER_STANDARDIZE_FLAG_IMPLICIT_ORDER_OF_OPERATIONS 1<<0
+int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitTokens, uint8_t flags);
 int mathsolver_reduce(mathsolver_token** tokens, int nTokens);
 
 mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nTokens);
@@ -124,7 +133,7 @@ int mathsolver_count_inflated(mathsolver_inflated_tokens* tokens);
 int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** deflated, int sDeflated);
 
 // Note: requires standardized tokens
-mathsolver_expression* mathsolver_to_expression(mathsolver_token** tokens, int nTokens);
-int mathsolver_from_expression(mathsolver_expression* expression, mathsolver_token** tokens, int nTokens);
+mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens);
+mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression);
 
 #endif

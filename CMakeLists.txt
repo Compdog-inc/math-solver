@@ -181,6 +181,14 @@ add_test(
   COMMAND $<TARGET_FILE:inflate_round>
 )
 
+# to_expression
+add_executable(to_expression tests/to_expression.c)
+target_link_libraries(to_expression PRIVATE math_solver)
+add_test(
+  NAME to_expression
+  COMMAND $<TARGET_FILE:to_expression>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
