@@ -155,8 +155,8 @@ typedef struct
 	};
 } mathsolver_variable;
 
-void mathsolver_push_variable_table(mathsolver_expression* expression, char* variables, int nVariables);
-void mathsolver_pop_variable_table(mathsolver_expression* expression, char* variables, int nVariables);
+void mathsolver_push_variable_table(mathsolver_expression* expression, char** variables, int nVariables);
+void mathsolver_pop_variable_table(mathsolver_expression* expression, char** variables, int nVariables);
 
 mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, mathsolver_variable* variables, int nVariables);
 
