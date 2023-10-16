@@ -243,34 +243,68 @@ int main()
 		printExpression(expression, 0);
 
 		printf("Evaluating expression...\n");
-		mathsolver_expression* eval = mathsolver_evaluate(expression);
-		printf("Evaluated expression:\n");
-		printExpression(eval, 0);
 
-		mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(eval);
-		printf("Inflated out:\n");
-		printInflatedTokens(inflatedOut);
-
-		mathsolver_token* tokensOut[64];
-		int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
-		mathsolver_format(output, 256, tokensOut, countOut);
-		printf("Deflated: %s\n", output);
-
-		countOut = mathsolver_reduce(tokensOut, countOut);
-		mathsolver_format(output, 256, tokensOut, countOut);
-		printf("Expression out: %s\n", output);
-
-		if (eval->copy_of != NULL) // free eval result if it's a copy
-			mathsolver_expression_free(&eval);
-
-		mathsolver_expression_free(&expression);
-		mathsolver_inflated_tokens_free(&inflated);
-		for (int i = 0; i < count; i++)
+		mathsolver_expression* xExp = malloc(sizeof(mathsolver_expression));
+		if (xExp != NULL)
 		{
-			mathsolver_token_free(&tokens[i]);
-		}
+			xExp->copy_of = NULL;
+			xExp->parent = NULL;
+			xExp->type = expNumber;
+			xExp->number = 3;
+			mathsolver_variable vars[] =
+			{
+				{
+					.indexed_value = xExp
+				}
+			};
+			char* var_indexes[] =
+			{
+				"x"
+			};
 
-		printf("Done.\n");
+			mathsolver_expression* eval = mathsolver_evaluate(expression, vars, 1);
+			printf("Evaluated expression:\n");
+			printExpression(eval, 0);
+
+			printf("Starting stress test...\n");
+
+			clock_t begin = clock();
+			mathsolver_push_variable_table(expression, var_indexes, 1);
+			for (int i = 0; i < 1000000000; i++)
+			{
+				xExp->number = i;
+				mathsolver_expression* eval2 = mathsolver_evaluate(expression, vars, 1);
+			}
+			mathsolver_pop_variable_table(expression, var_indexes, 1);
+			clock_t end = clock();
+			double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+			printf("Time spent: %f\n", time_spent);
+
+			mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(eval);
+			printf("Inflated out:\n");
+			printInflatedTokens(inflatedOut);
+
+			mathsolver_token* tokensOut[64];
+			int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
+			mathsolver_format(output, 256, tokensOut, countOut);
+			printf("Deflated: %s\n", output);
+
+			countOut = mathsolver_reduce(tokensOut, countOut);
+			mathsolver_format(output, 256, tokensOut, countOut);
+			printf("Expression out: %s\n", output);
+
+			if (eval->copy_of != NULL) // free eval result if it's a copy
+				mathsolver_expression_free(&eval);
+
+			mathsolver_expression_free(&expression);
+			mathsolver_inflated_tokens_free(&inflated);
+			for (int i = 0; i < count; i++)
+			{
+				mathsolver_token_free(&tokens[i]);
+			}
+
+			printf("Done.\n");
+		}
 	}
 	return 0;
 }

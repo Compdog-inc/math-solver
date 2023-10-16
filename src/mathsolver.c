@@ -1445,6 +1445,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 			expression->type = expVariable;
 			expression->variable = tokens->token->variable;
 			expression->variable_length = tokens->token->size;
+			expression->indexed = 0;
 			break;
 		}
 	}
@@ -1595,6 +1596,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 			case expVariable:
 				currentInst->variable = childList[0]->variable;
 				currentInst->variable_length = childList[0]->variable_length;
+				currentInst->indexed = childList[0]->indexed;
 				break;
 			case expInstruction:
 				currentInst->instruction = childList[0]->instruction;
@@ -1778,7 +1780,52 @@ mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* ex
 	return mathsolver_from_expression_parent(expression, NULL);
 }
 
-mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
+void mathsolver_push_variable_table(mathsolver_expression* expression, char** variables, int nVariables)
+{
+	// go through the tree and update all expVariables
+	if (expression->type == expVariable && !expression->indexed)
+	{
+		for (int i = 0; i < nVariables; i++)
+		{
+			if (strncmp(variables[i], expression->variable, expression->variable_length) == 0)
+			{
+				expression->indexed = 1;
+				expression->variable = (char*)i;
+				break;
+			}
+		}
+	}
+	else if (expression->type == expInstruction)
+	{
+		for (int i = 0; i < expression->node_count; i++)
+		{
+			mathsolver_push_variable_table(expression->nodes[i], variables, nVariables);
+		}
+	}
+}
+
+void mathsolver_pop_variable_table(mathsolver_expression* expression, char** variables, int nVariables)
+{
+	// go through the tree and update all expVariables
+	if (expression->type == expVariable && expression->indexed)
+	{
+		int ind = (int)expression->variable;
+		if (ind >= 0 && ind < nVariables)
+		{
+			expression->indexed = 0;
+			expression->variable = variables[ind];
+		}
+	}
+	else if (expression->type == expInstruction)
+	{
+		for (int i = 0; i < expression->node_count; i++)
+		{
+			mathsolver_pop_variable_table(expression->nodes[i], variables, nVariables);
+		}
+	}
+}
+
+mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, mathsolver_variable* variables, int nVariables)
 {
 	if (expression->type == expNumber)
 	{
@@ -1786,16 +1833,25 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 	}
 	else if (expression->type == expVariable)
 	{
-		// convert var into new number expression if defined
-		mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
-		if (exp == NULL)
-			return expression;
+		if (expression->indexed)
+		{
+			int ind = (int)expression->variable;
+			if (ind >= 0 && ind < nVariables)
+			{
+				return variables[ind].indexed_value;
+			}
+		}
+		else
+		{
+			for (int i = 0; i < nVariables; i++)
+			{
+				if (strncmp(variables[i].name, expression->variable, expression->variable_length) == 0)
+					return variables[i].simple_value;
+			}
+		}
 
-		exp->type = expNumber;
-		exp->parent = expression->parent;
-		exp->number = 12.34;
-		exp->copy_of = expression;
-		return exp;
+		// variable not found
+		return expression;
 	}
 	else
 	{
@@ -1806,8 +1862,8 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 2)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
-				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1], variables, nVariables);
 
 				if (left->type == expNumber && right->type == expNumber)
 				{
@@ -1833,8 +1889,8 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 2)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
-				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1], variables, nVariables);
 
 				if (left->type == expNumber && right->type == expNumber)
 				{
@@ -1860,7 +1916,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 1)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
 
 				if (left->type == expNumber)
 				{
@@ -1884,8 +1940,8 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 2)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
-				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1], variables, nVariables);
 
 				if (left->type == expNumber && right->type == expNumber)
 				{
@@ -1911,8 +1967,8 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 2)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
-				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1], variables, nVariables);
 
 				if (left->type == expNumber && right->type == expNumber)
 				{
@@ -1938,8 +1994,8 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 2)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
-				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
+				mathsolver_expression* right = mathsolver_evaluate(expression->nodes[1], variables, nVariables);
 
 				if (left->type == expNumber && right->type == expNumber)
 				{
@@ -1965,7 +2021,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression)
 		{
 			if (expression->node_count == 1)
 			{
-				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0]);
+				mathsolver_expression* left = mathsolver_evaluate(expression->nodes[0], variables, nVariables);
 
 				if (left->type == expNumber)
 				{

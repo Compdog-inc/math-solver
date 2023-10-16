@@ -104,6 +104,7 @@ typedef struct _mathsolver_expression
 		{
 			char* variable;
 			int variable_length;
+			uint8_t indexed;
 		};
 		struct
 		{
@@ -142,6 +143,21 @@ int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** de
 mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens);
 mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression);
 
-mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression);
+typedef struct
+{
+	union
+	{
+		struct {
+			char* name;
+			mathsolver_expression* simple_value;
+		};
+		mathsolver_expression* indexed_value;
+	};
+} mathsolver_variable;
+
+void mathsolver_push_variable_table(mathsolver_expression* expression, char* variables, int nVariables);
+void mathsolver_pop_variable_table(mathsolver_expression* expression, char* variables, int nVariables);
+
+mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, mathsolver_variable* variables, int nVariables);
 
 #endif
