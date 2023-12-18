@@ -1,5 +1,7 @@
 #include "main.h"
+#ifdef _DEBUG
 #include <crtdbg.h>
+#endif
 
 void printIndent(int depth)
 {
@@ -221,7 +223,9 @@ void printExpression(mathsolver_expression* expression, int depth)
 
 int main()
 {
+#ifdef _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
 
 	while (1) {
 		printf("Enter expression:\n");
