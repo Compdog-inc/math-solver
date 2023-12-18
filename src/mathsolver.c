@@ -1,5 +1,8 @@
 #include "mathsolver.h"
 
+#undef max
+#define max(a,b) ((a)>(b)?(a):(b))
+
 void mathsolver_token_free(mathsolver_token** token)
 {
 	switch((*token)->type)
