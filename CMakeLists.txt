@@ -161,6 +161,14 @@ add_test(
   COMMAND $<TARGET_FILE:standardize_implicit_mul>
 )
 
+# standardize_subadd
+add_executable(standardize_subadd tests/standardize_subadd.c)
+target_link_libraries(standardize_subadd PRIVATE math_solver)
+add_test(
+  NAME standardize_subadd
+  COMMAND $<TARGET_FILE:standardize_subadd>
+)
+
 # reduce_implicit_mul
 add_executable(reduce_implicit_mul tests/reduce_implicit_mul.c)
 target_link_libraries(reduce_implicit_mul PRIVATE math_solver)
@@ -223,6 +231,22 @@ target_link_libraries(variable_table_one PRIVATE math_solver)
 add_test(
   NAME variable_table_one
   COMMAND $<TARGET_FILE:variable_table_one>
+)
+
+# simple_round
+add_executable(simple_round tests/simple_round.c)
+target_link_libraries(simple_round PRIVATE math_solver)
+add_test(
+  NAME simple_round
+  COMMAND $<TARGET_FILE:simple_round>
+)
+
+# simplify_factors
+add_executable(simplify_factors tests/simplify_factors.c)
+target_link_libraries(simplify_factors PRIVATE math_solver)
+add_test(
+  NAME simplify_factors
+  COMMAND $<TARGET_FILE:simplify_factors>
 )
 
 target_include_directories(math_solver PUBLIC

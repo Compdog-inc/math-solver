@@ -130,6 +130,7 @@ uint8_t is_integer(double value);
 
 int mathsolver_parse(char *str, mathsolver_token **tokens, int nTokens);
 int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int nTokens);
+int mathsolver_format_expression(char* output, int sOutput, mathsolver_expression* expression, int maxTokens);
 
 #define MATHSOLVER_STANDARDIZE_FLAG_NONE 0
 #define MATHSOLVER_STANDARDIZE_FLAG_IMPLICIT_ORDER_OF_OPERATIONS 1<<0
@@ -167,6 +168,9 @@ void mathsolver_push_variable_table(mathsolver_expression* expression, char** va
 void mathsolver_pop_variable_table(mathsolver_expression* expression, char** variables, int nVariables);
 
 mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, mathsolver_variable* variables, int nVariables);
+mathsolver_expression* mathsolver_convert_instruction(mathsolver_expression* expression, mathsolver_instruction toInstruction);
+mathsolver_expression* mathsolver_to_shallow(mathsolver_expression* expression);
+mathsolver_expression* mathsolver_to_deep(mathsolver_expression* expression);
 mathsolver_expression* mathsolver_simplify(mathsolver_expression* expression);
 
 #endif

@@ -551,6 +551,33 @@ int mathsolver_format(char* output, int sOutput, mathsolver_token** tokens, int 
 	return ind;
 }
 
+int mathsolver_format_expression(char* output, int sOutput, mathsolver_expression* expression, int maxTokens)
+{
+	mathsolver_expression* deep = mathsolver_to_deep(expression);
+	mathsolver_inflated_tokens* inflated = mathsolver_from_expression(deep);
+	mathsolver_token** tokens = calloc(maxTokens, sizeof(mathsolver_token*));
+
+	if (tokens == NULL)
+		return -1;
+
+	int count = mathsolver_deflate(inflated, tokens, maxTokens);
+	count = mathsolver_reduce(tokens, count);
+
+	int len = mathsolver_format(output, sOutput, tokens, count);
+
+	//mathsolver_expression_free(&deep);
+	mathsolver_inflated_tokens_free(&inflated);
+
+	for (int i = 0; i < count; i++)
+	{
+		free(tokens[i]);
+	}
+
+	free(tokens);
+
+	return len;
+}
+
 int mathsolver_insert_token(mathsolver_token* token, int index, mathsolver_token** tokens, int nTokens, int limitTokens)
 {
 	if (nTokens < limitTokens) {
@@ -829,8 +856,7 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 						{
 							openIndex = i;
 						}
-						else
-						{
+						else {
 							break;
 						}
 
@@ -1028,6 +1054,115 @@ int mathsolver_standardize(mathsolver_token** tokens, int nTokens, int limitToke
 
 							i++;
 						}
+					}
+					break;
+				}
+				case Sub:
+				{
+					// explicitly state subtract operator
+					// x-2+y becomes (x-2)+y
+					if (i < nTokens - 1 && i < limitTokens - 1)
+					{
+						int openIndex = -1;
+						if (i > 0)
+						{
+							openIndex = i - 1;
+
+							if (tokens[i]->type == Operator && tokens[i - 1]->operator == ClosingParentheses)
+							{
+								// search left for opening parentheses with same relative depth
+								int depth = 0;
+								for (int j = i - 2; j >= 0; j--)
+								{
+									if (tokens[j]->type == Operator)
+									{
+										if (tokens[j]->operator == ClosingParentheses)
+										{
+											depth++;
+										}
+										else if (tokens[j]->operator == OpeningParentheses)
+										{
+											if (depth == 0)
+											{
+												openIndex = j - 1;
+												break;
+											}
+											else
+											{
+												depth--;
+											}
+										}
+									}
+								}
+							}
+						}
+						else {
+							break;
+						}
+
+						int closeIndex = i + 1;
+
+						if (tokens[i + 1]->type != Operator)
+						{
+							closeIndex = i + 2;
+						}
+						else if (tokens[i + 1]->operator == OpeningParentheses)
+						{
+							// search right for closing parentheses with same relative depth
+							int depth = 0;
+							for (int j = i + 2; j < nTokens && j < limitTokens; j++)
+							{
+								if (tokens[j]->type == Operator)
+								{
+									if (tokens[j]->operator == OpeningParentheses)
+									{
+										depth++;
+									}
+									else if (tokens[j]->operator == ClosingParentheses)
+									{
+										if (depth == 0)
+										{
+											closeIndex = j + 1;
+											break;
+										}
+										else
+										{
+											depth--;
+										}
+									}
+								}
+							}
+						}
+
+						// get size of token
+						int size = sizeof(mathsolver_token);
+						mathsolver_token* token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= OpeningParentheses;
+							token->size = size;
+
+							// insert opar op at open index and shift tokens
+							nTokens = mathsolver_insert_token(token, openIndex, tokens, nTokens, limitTokens);
+						}
+
+						// get size of token
+						size = sizeof(mathsolver_token);
+						token = (mathsolver_token*)malloc(size); // allocate
+						if (token != NULL)
+						{
+							// create token
+							token->type = Operator;
+							token->operator= ClosingParentheses;
+							token->size = size;
+
+							// insert cpar op at close index + 1 (since prev insert shifted this index) and shift tokens
+							nTokens = mathsolver_insert_token(token, closeIndex + 1, tokens, nTokens, limitTokens);
+						}
+
+						i++;
 					}
 					break;
 				}
@@ -1972,6 +2107,11 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 
 					return exp;
 				}
+				else
+				{
+					expression->nodes[0] = left;
+					expression->nodes[1] = right;
+				}
 			}
 			break;
 		}
@@ -2000,6 +2140,11 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 
 					return exp;
 				}
+				else
+				{
+					expression->nodes[0] = left;
+					expression->nodes[1] = right;
+				}
 			}
 			break;
 		}
@@ -2024,6 +2169,10 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 						mathsolver_expression_free(&left);
 
 					return exp;
+				}
+				else
+				{
+					expression->nodes[0] = left;
 				}
 			}
 			break;
@@ -2053,6 +2202,11 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 
 					return exp;
 				}
+				else
+				{
+					expression->nodes[0] = left;
+					expression->nodes[1] = right;
+				}
 			}
 			break;
 		}
@@ -2081,6 +2235,11 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 
 					return exp;
 				}
+				else
+				{
+					expression->nodes[0] = left;
+					expression->nodes[1] = right;
+				}
 			}
 			break;
 		}
@@ -2108,6 +2267,11 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 						mathsolver_expression_free(&right);
 
 					return exp;
+				}
+				else
+				{
+					expression->nodes[0] = left;
+					expression->nodes[1] = right;
 				}
 			}
 			break;
@@ -2143,10 +2307,477 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 
 					return exp;
 				}
+				else
+				{
+					expression->nodes[0] = left;
+				}
 			}
 			break;
 		}
 		}
 		return expression;
 	}
+}
+
+mathsolver_expression* mathsolver_convert_instruction(mathsolver_expression* expression, mathsolver_instruction toInstruction)
+{
+	if (expression->type != expInstruction)
+		return expression;
+	if (expression->instruction == toInstruction)
+		return expression;
+
+	if (expression->instruction == iAdd && toInstruction == iSub)
+	{
+		expression->instruction = iSub;
+		for (int i = 1; i < expression->node_count; i++)
+		{
+			if (expression->nodes[i]->type == expInstruction && expression->nodes[i]->instruction == iNeg)
+			{
+				expression->nodes[i] = expression->nodes[i]->nodes[0];
+			}
+			else
+			{
+				mathsolver_expression* inv = malloc(sizeof(mathsolver_expression));
+				if (inv != NULL)
+				{
+					inv->type = expInstruction;
+					inv->instruction = iNeg;
+					inv->parent = expression;
+					inv->copy_of = expression->nodes[i];
+					inv->flags = expression->nodes[i]->flags;
+					inv->node_count = 1;
+					inv->nodes = calloc(1, sizeof(mathsolver_expression*));
+					if (inv->nodes != NULL)
+					{
+						inv->nodes[0] = expression->nodes[i];
+					}
+					expression->nodes[i] = inv;
+				}
+			}
+		}
+
+		return expression;
+	} else if (expression->instruction == iSub && toInstruction == iAdd)
+	{
+		expression->instruction = iAdd;
+		for (int i = 1; i < expression->node_count; i++)
+		{
+			if (expression->nodes[i]->type == expInstruction && expression->nodes[i]->instruction == iNeg)
+			{
+				expression->nodes[i] = expression->nodes[i]->nodes[0];
+			}
+			else
+			{
+				mathsolver_expression* inv = malloc(sizeof(mathsolver_expression));
+				if (inv != NULL)
+				{
+					inv->type = expInstruction;
+					inv->instruction = iNeg;
+					inv->parent = expression;
+					inv->copy_of = expression->nodes[i];
+					inv->flags = expression->nodes[i]->flags;
+					inv->node_count = 1;
+					inv->nodes = calloc(1, sizeof(mathsolver_expression*));
+					if (inv->nodes != NULL)
+					{
+						inv->nodes[0] = expression->nodes[i];
+					}
+					expression->nodes[i] = inv;
+				}
+			}
+		}
+
+		return expression;
+	}
+	else if (expression->instruction == iDiv && toInstruction == iMul)
+	{
+		expression->instruction = iMul;
+		for (int i = 1; i < expression->node_count; i++)
+		{
+			mathsolver_expression* inv = malloc(sizeof(mathsolver_expression));
+			if (inv != NULL)
+			{
+				inv->type = expInstruction;
+				inv->instruction = iDiv;
+				inv->parent = expression;
+				inv->copy_of = expression->nodes[i];
+				inv->flags = expression->nodes[i]->flags;
+				inv->node_count = 2;
+				inv->nodes = calloc(2, sizeof(mathsolver_expression*));
+				if (inv->nodes != NULL)
+				{
+					// 1/x
+					inv->nodes[0] = mathsolver_number_expression(1);
+					inv->nodes[1] = expression->nodes[i];
+				}
+				expression->nodes[i] = inv;
+			}
+		}
+
+		return expression;
+	}
+	else if (expression->instruction == iMul && toInstruction == iDiv)
+	{
+		expression->instruction = iDiv;
+		for (int i = 1; i < expression->node_count; i++)
+		{
+			mathsolver_expression* inv = malloc(sizeof(mathsolver_expression));
+			if (inv != NULL)
+			{
+				inv->type = expInstruction;
+				inv->instruction = iDiv;
+				inv->parent = expression;
+				inv->copy_of = expression->nodes[i];
+				inv->flags = expression->nodes[i]->flags;
+				inv->node_count = 2;
+				inv->nodes = calloc(2, sizeof(mathsolver_expression*));
+				if (inv->nodes != NULL)
+				{
+					// 1/x
+					inv->nodes[0] = mathsolver_number_expression(1);
+					inv->nodes[1] = expression->nodes[i];
+				}
+				expression->nodes[i] = inv;
+			}
+		}
+
+		return expression;
+	}
+
+	return expression;
+}
+
+mathsolver_expression* mathsolver_to_shallow(mathsolver_expression* expression)
+{
+	if (expression->type == expNumber || expression->type == expVariable)
+	{
+		return expression;
+	}
+	else
+	{
+		mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+		if (exp == NULL)
+			return expression;
+		exp->type = expInstruction;
+		exp->instruction = expression->instruction;
+		exp->parent = expression->parent;
+		exp->copy_of = expression;
+		exp->flags = expression->flags;
+		exp->node_count = 0;
+		int expCapacity = expression->node_count;
+		exp->nodes = calloc(expCapacity, sizeof(mathsolver_expression*));
+		if (exp->nodes != NULL)
+		{
+			for (int i = 0; i < expression->node_count; i++)
+			{
+				mathsolver_expression* node = expression->nodes[i];
+				if (node->type == expInstruction)
+				{
+					node = mathsolver_to_shallow(node);
+				}
+
+				if (node->type == expNumber || node->type == expVariable || (node->type == expInstruction && node->instruction != exp->instruction))
+				{
+					if (exp->node_count >= expCapacity)
+					{
+						expCapacity <<= 1;
+						void* tmp = realloc(exp->nodes, sizeof(mathsolver_expression*) * expCapacity);
+						if (tmp == NULL)
+							return exp;
+						exp->nodes = tmp;
+					}
+
+					exp->nodes[exp->node_count++] = node;
+				}
+				else if (node->type == expInstruction)
+				{
+					node = mathsolver_convert_instruction(node, exp->instruction);
+
+					if (node->instruction == exp->instruction)
+					{
+						if (expCapacity < exp->node_count + node->node_count)
+						{
+							expCapacity = max(expCapacity << 1, exp->node_count + node->node_count);
+							void* tmp = realloc(exp->nodes, sizeof(mathsolver_expression*) * expCapacity);
+							if (tmp == NULL)
+								return exp;
+							exp->nodes = tmp;
+						}
+
+						for (int j = 0; j < node->node_count; j++)
+						{
+							exp->nodes[exp->node_count++] = node->nodes[j];
+						}
+					}
+				}
+			}
+
+			return exp;
+		}
+	}
+
+	return expression;
+}
+
+mathsolver_expression* mathsolver_to_deep(mathsolver_expression* expression)
+{
+	if (expression->type == expNumber || expression->type == expVariable || expression->node_count <= 2)
+	{
+		return expression;
+	}
+	else
+	{
+		mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+		if (exp == NULL)
+			return expression;
+		exp->type = expInstruction;
+		exp->instruction = expression->instruction;
+		exp->parent = expression->parent;
+		exp->copy_of = expression;
+		exp->flags = expression->flags;
+		exp->node_count = 0;
+		exp->nodes = NULL;
+
+		mathsolver_expression* deepest = exp;
+
+		// go through each node and add it to the current deepest node
+		// backwards because we want the deepest instruction to be left-to-right
+		for (int i = expression->node_count-1; i >= 0; i--)
+		{
+			mathsolver_expression* node = expression->nodes[i];
+			if (node->type == expInstruction)
+			{
+				node = mathsolver_to_deep(node);
+			}
+
+			deepest->nodes = calloc(2, sizeof(mathsolver_expression*));
+			deepest->node_count = 2;
+			if (deepest->nodes != NULL)
+			{
+				if (i > 0)
+				{
+					deepest->nodes[1] = node;
+					mathsolver_expression* tmp = malloc(sizeof(mathsolver_expression));
+					if (tmp == NULL)
+						return deepest;
+					tmp->type = expInstruction;
+					tmp->instruction = deepest->instruction;
+					tmp->parent = deepest;
+					tmp->copy_of = deepest;
+					tmp->flags = deepest->flags;
+					tmp->node_count = 0;
+					tmp->nodes = NULL;
+					if (deepest->nodes != NULL)
+						deepest->nodes[0] = tmp;
+					deepest = tmp;
+				}
+				else
+				{
+					deepest->parent->nodes[0] = node;
+				}
+			}
+		}
+
+		return exp;
+	}
+
+	return expression;
+}
+
+mathsolver_expression* mathsolver_simplify(mathsolver_expression* expression)
+{
+	if (expression->type == expInstruction)
+	{
+		// multiplication distribution
+		if (expression->instruction == iMul)
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = mathsolver_simplify(expression->nodes[0]);
+				mathsolver_expression* right = mathsolver_simplify(expression->nodes[1]);
+
+				mathsolver_expression* leftShallow = mathsolver_to_shallow(left);
+				mathsolver_expression* rightShallow = mathsolver_to_shallow(right);
+				
+				//a(b) -> ab
+				if ((leftShallow->type == expNumber || leftShallow->type == expVariable) && (rightShallow->type == expNumber || rightShallow->type == expVariable))
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					if ((leftShallow->type == expNumber && rightShallow->type == expNumber && leftShallow->number == rightShallow->number) || 
+						(leftShallow->type == expVariable && rightShallow->type == expVariable && leftShallow->variable_length == rightShallow->variable_length &&
+							strncmp(leftShallow->variable, rightShallow->variable, leftShallow->variable_length) == 0))
+					{
+						exp->type = expInstruction;
+						exp->instruction = iExponent;
+						exp->parent = expression->parent;
+						exp->copy_of = expression;
+						exp->flags = expression->flags;
+						exp->node_count = 2;
+						exp->nodes = calloc(2, sizeof(mathsolver_expression*));
+						if (exp->nodes != NULL)
+						{
+							exp->nodes[0] = leftShallow;
+							exp->nodes[1] = mathsolver_number_expression(2);
+						}
+					}
+					else
+					{
+						exp->type = expInstruction;
+						exp->instruction = expression->instruction;
+						exp->parent = expression->parent;
+						exp->copy_of = expression;
+						exp->flags = expression->flags;
+						exp->node_count = 2;
+						exp->nodes = calloc(2, sizeof(mathsolver_expression*));
+						if (exp->nodes != NULL)
+						{
+							exp->nodes[0] = leftShallow;
+							exp->nodes[1] = rightShallow;
+						}
+					}
+
+					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
+						mathsolver_expression_free(&left);
+					if (right->copy_of != NULL)
+						mathsolver_expression_free(&right);
+
+					return exp;
+				}
+				// a(b+c) -> ab+ac
+				else if((leftShallow->type == expNumber || leftShallow->type == expVariable) && rightShallow->type == expInstruction)
+				{
+					// edit nodes in rightShallow to be multiplication instructions with leftShallow
+					for (int i = 0; i < rightShallow->node_count; i++)
+					{
+						mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+						if (exp != NULL)
+						{
+							exp->type = expInstruction;
+							exp->instruction = expression->instruction;
+							exp->parent = rightShallow->nodes[i]->parent;
+							exp->copy_of = rightShallow->nodes[i];
+							exp->flags = rightShallow->nodes[i]->flags;
+							exp->node_count = 2;
+							exp->nodes = calloc(2, sizeof(mathsolver_expression*));
+							if (exp->nodes != NULL)
+							{
+								exp->nodes[0] = leftShallow;
+								exp->nodes[1] = rightShallow->nodes[i];
+							}
+							rightShallow->nodes[i] = exp;
+						}
+					}
+					return rightShallow;
+				}
+				// (a+b)c -> ac+bc
+				else if (leftShallow->type == expInstruction && (rightShallow->type == expNumber || rightShallow->type == expVariable))
+				{
+					// edit nodes in leftShallow to be multiplication instructions with rightShallow
+					for (int i = 0; i < leftShallow->node_count; i++)
+					{
+						mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+						if (exp != NULL)
+						{
+							exp->type = expInstruction;
+							exp->instruction = expression->instruction;
+							exp->parent = leftShallow->nodes[i]->parent;
+							exp->copy_of = leftShallow->nodes[i];
+							exp->flags = leftShallow->nodes[i]->flags;
+							exp->node_count = 2;
+							exp->nodes = calloc(2, sizeof(mathsolver_expression*));
+							if (exp->nodes != NULL)
+							{
+								exp->nodes[0] = rightShallow;
+								exp->nodes[1] = leftShallow->nodes[i];
+							}
+							leftShallow->nodes[i] = exp;
+						}
+					}
+					return leftShallow;
+				}
+				// (a+b)(c+d) -> ac+ad+bc+bd
+				else if (leftShallow->type == expInstruction && rightShallow->type == expInstruction)
+				{
+					mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+					if (exp == NULL)
+						return expression;
+					exp->type = expInstruction;
+					exp->instruction = iAdd;
+					exp->parent = expression->parent;
+					exp->copy_of = expression;
+					exp->flags = expression->flags;
+					exp->node_count = leftShallow->node_count + rightShallow->node_count;
+					exp->nodes = calloc(exp->node_count, sizeof(mathsolver_expression*));
+
+					leftShallow = mathsolver_convert_instruction(leftShallow, exp->instruction);
+					rightShallow = mathsolver_convert_instruction(rightShallow, exp->instruction);
+
+					int c = 0;
+					if (exp->nodes != NULL)
+					{
+						for (int i = 0; i < leftShallow->node_count; i++)
+						{
+							for (int j = 0; j < rightShallow->node_count; j++)
+							{
+								mathsolver_expression* tmp = malloc(sizeof(mathsolver_expression));
+								if (tmp != NULL)
+								{
+									tmp->type = expInstruction;
+									tmp->instruction = expression->instruction;
+									tmp->parent = exp;
+									tmp->copy_of = exp;
+									tmp->flags = exp->flags;
+									tmp->node_count = 2;
+									tmp->nodes = calloc(2, sizeof(mathsolver_expression*));
+									if (tmp->nodes != NULL)
+									{
+										tmp->nodes[0] = leftShallow->nodes[i];
+										tmp->nodes[1] = rightShallow->nodes[j];
+									}
+									exp->nodes[c++] = mathsolver_simplify(tmp);
+								}
+							}
+						}
+
+						return exp;
+					}
+				}
+			}
+		}
+		//else if (expression->instruction == iDiv) // convert div to mul and simplify
+		//{
+		//	if (expression->node_count == 2)
+		//	{
+		//		mathsolver_expression* left = expression->nodes[0];
+		//		mathsolver_expression* right = expression->nodes[1];
+
+		//		mathsolver_expression* leftShallow = (left);
+		//		mathsolver_expression* rightShallow = (right);
+
+		//		if ((leftShallow->type == expNumber || leftShallow->type == expVariable) && (rightShallow->type == expNumber || rightShallow->type == expVariable))
+		//		{
+		//			return expression;
+		//		}
+		//	}
+
+		//	return mathsolver_simplify(mathsolver_convert_instruction(expression, iMul));
+		//}
+		// add negative conversion
+		else if (expression->instruction == iAdd)
+		{
+			if (expression->node_count == 2)
+			{
+				mathsolver_expression* left = expression->nodes[0];
+				mathsolver_expression* right = expression->nodes[1];
+				if ((right->type == expNumber && right->number < 0) || (right->type == expInstruction && right->instruction == iNeg))
+				{
+					return mathsolver_convert_instruction(expression, iSub);
+				}
+			}
+		}
+	}
+
+	return expression;
 }
