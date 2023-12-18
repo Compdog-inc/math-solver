@@ -42,6 +42,10 @@ void mathsolver_expression_free(mathsolver_expression** expression)
 		}
 		free((*expression)->nodes);
 	}
+	else if ((*expression)->type == expVariable && ((*expression)->flags & MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN) && !(*expression)->indexed)
+	{
+		free((*expression)->variable);
+	}
 
 	free(*expression);
 	*expression = NULL;
@@ -111,6 +115,27 @@ uint8_t is_integer(double value)
 	}
 }
 
+char* _g_strndup(char* str, int len)
+{
+#if _DEBUG
+	char* dup = malloc(sizeof(char) * ((size_t)len + 1)); // create space for null terminator
+#else
+	char* dup = malloc(sizeof(char) * len);
+#endif
+	if (dup != NULL)
+	{
+		memcpy(dup, str, sizeof(char) * (size_t)len);
+#if _DEBUG
+		* (dup + len) = '\0'; // force null-termination for debugger print
+#endif
+		return dup;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
 void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, char** currentValueStart, mathsolver_token*** tokens, int* tokenCount, int nTokens)
 {
 	if ((*tokenCount) < nTokens - 1) {
@@ -122,24 +147,16 @@ void mathsolver_addtoken(mathsolver_token_type* currentTokenType, char** str, ch
 			// create token
 			token->type = *currentTokenType;
 			int strLen = (int)(*str - *currentValueStart);
-#if _DEBUG
-			char* dup = malloc(sizeof(char) * ((size_t)strLen + 1)); // create space for null terminator
-#else
-			char* dup = malloc(sizeof(char) * strLen);
-#endif
+			char* dup = _g_strndup(*currentValueStart, strLen);
 			if (dup != NULL)
 			{
-				memcpy(dup, *currentValueStart, strLen);
-#if _DEBUG
-				* (dup + strLen) = '\0'; // force null-termination for debugger print
-#endif
 				if (*currentTokenType == Number)
 				{
 					token->number = dup;
 				}
 				else if (*currentTokenType == Variable)
 				{
-					token->number = dup;
+					token->variable = dup;
 				}
 			}
 			token->size = strLen;
@@ -1424,12 +1441,53 @@ int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** de
 	return mathsolver_copy_tokens(tokens, deflated, 0, sDeflated);
 }
 
-mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens)
+mathsolver_expression* mathsolver_number_expression(double number)
+{
+	mathsolver_expression* exp = malloc(sizeof(mathsolver_expression));
+	if (exp != NULL)
+	{
+		exp->copy_of = NULL;
+		exp->parent = NULL;
+		exp->type = expNumber;
+		exp->number = number;
+		exp->flags = 0;
+		return exp;
+	}
+	return NULL;
+}
+
+mathsolver_expression* mathsolver_parsed_expression(char* str, int maxTokens)
+{
+	mathsolver_token** tokens = malloc(sizeof(mathsolver_token*) * maxTokens);
+	if (tokens == NULL)
+		return NULL;
+
+	int count = mathsolver_parse(str, tokens, maxTokens);
+	count = mathsolver_standardize(tokens, count, maxTokens, MATHSOLVER_STANDARDIZE_FLAG_NONE);
+
+	mathsolver_inflated_tokens* inflated = mathsolver_inflate(tokens, count);
+
+	// convert to expression without reference to prevent memory leaks
+	mathsolver_expression* expression = mathsolver_to_expression(inflated, MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN);
+
+	// free temp resources
+	mathsolver_inflated_tokens_free(&inflated);
+	for (int i = 0; i < count; i++)
+	{
+		mathsolver_token_free(&tokens[i]);
+	}
+	free(tokens);
+
+	return expression;
+}
+
+mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens, uint8_t flags)
 {
 	mathsolver_expression* expression = malloc(sizeof(mathsolver_expression));
 	expression->parent = NULL;
 	expression->nodes = NULL;
 	expression->copy_of = NULL;
+	expression->flags = 0;
 	if (expression == NULL)
 		return NULL;
 
@@ -1439,11 +1497,36 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 		{
 		case Number:
 			expression->type = expNumber;
+#ifdef DEBUG
 			expression->number = atof(tokens->token->number);
+#else
+			char* numTmp = malloc(sizeof(char) * (tokens->token->size + 1));
+			memcpy(numTmp, tokens->token->number, sizeof(char) * tokens->token->size);
+			numTmp[tokens->token->size] = '\0';
+			expression->number = atof(numTmp);
+			free(numTmp);
+#endif
 			break;
 		case Variable:
 			expression->type = expVariable;
-			expression->variable = tokens->token->variable;
+			if (flags & MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN)
+			{
+				// make a copy of the variable string
+				char* dup = _g_strndup(tokens->token->variable, tokens->token->size);
+				if (dup == NULL)
+				{
+					expression->variable = tokens->token->variable;
+				}
+				else
+				{
+					expression->variable = dup;
+					expression->flags |= MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN;
+				}
+			}
+			else
+			{
+				expression->variable = tokens->token->variable;
+			}
 			expression->variable_length = tokens->token->size;
 			expression->indexed = 0;
 			break;
@@ -1519,6 +1602,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 					return NULL;
 				currentInst->parent = tmp;
 				currentInst->copy_of = NULL;
+				currentInst->flags = 0;
 
 				if (tmp->instruction != iFactorial)
 				{
@@ -1550,7 +1634,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 			}
 			else
 			{
-				mathsolver_expression* child = mathsolver_to_expression(tokens->children[i]);
+				mathsolver_expression* child = mathsolver_to_expression(tokens->children[i], flags);
 				if (childCount >= childListSize)
 				{
 					mathsolver_expression** rel = realloc(childList, sizeof(mathsolver_expression*) * childListSize * 2);
@@ -1588,6 +1672,7 @@ mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* toke
 		{
 			// only possible to have root expression with one child
 			currentInst->type = childList[0]->type;
+			currentInst->flags = childList[0]->flags;
 			switch (currentInst->type)
 			{
 			case expNumber:
@@ -1791,6 +1876,8 @@ void mathsolver_push_variable_table(mathsolver_expression* expression, char** va
 			{
 				expression->indexed = 1;
 				expression->variable = (char*)i;
+				// expression_free workaround for optimized variable tables
+				expression->flags &= ~MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN;
 				break;
 			}
 		}
@@ -1814,6 +1901,8 @@ void mathsolver_pop_variable_table(mathsolver_expression* expression, char** var
 		{
 			expression->indexed = 0;
 			expression->variable = variables[ind];
+			// expression_free workaround for optimized variable tables
+			expression->flags &= ~MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN;
 		}
 	}
 	else if (expression->type == expInstruction)
@@ -1874,6 +1963,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = left->number + right->number;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -1901,6 +1991,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = left->number - right->number;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -1927,6 +2018,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = -left->number;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -1952,6 +2044,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = left->number * right->number;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -1979,6 +2072,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = left->number / right->number;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -2006,6 +2100,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = pow(left->number, right->number);
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);
@@ -2041,6 +2136,7 @@ mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, ma
 					exp->parent = expression->parent;
 					exp->number = out;
 					exp->copy_of = expression;
+					exp->flags = expression->flags;
 
 					if (left->copy_of != NULL) // prevent memory leaks for copied expressions
 						mathsolver_expression_free(&left);

@@ -1,4 +1,5 @@
 #include "main.h"
+#include <crtdbg.h>
 
 void printIndent(int depth)
 {
@@ -220,6 +221,8 @@ void printExpression(mathsolver_expression* expression, int depth)
 
 int main()
 {
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF | _CRTDBG_DELAY_FREE_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
 	while (1) {
 		printf("Enter expression:\n");
 
@@ -227,30 +230,17 @@ int main()
 		if (fgets(str, 256, stdin) == NULL)
 			return 1;
 
-		mathsolver_token* tokens[64];
-		int count = mathsolver_parse(str, tokens, 64);
-		count = mathsolver_standardize(tokens, count, 64, 0);
-
 		char output[256];
-		mathsolver_format(output, 256, tokens, count);
-		printf("Standardized: %s\n", output);
-
-		mathsolver_inflated_tokens* inflated = mathsolver_inflate(tokens, count);
-		printInflatedTokens(inflated);
-
-		mathsolver_expression* expression = mathsolver_to_expression(inflated);
+		
+		mathsolver_expression* expression = mathsolver_parsed_expression(str, 256);
 		printf("Instruction expression:\n");
 		printExpression(expression, 0);
 
 		printf("Evaluating expression...\n");
 
-		mathsolver_expression* xExp = malloc(sizeof(mathsolver_expression));
+		mathsolver_expression* xExp = mathsolver_number_expression(3);
 		if (xExp != NULL)
 		{
-			xExp->copy_of = NULL;
-			xExp->parent = NULL;
-			xExp->type = expNumber;
-			xExp->number = 3;
 			mathsolver_variable vars[] =
 			{
 				{
@@ -262,23 +252,11 @@ int main()
 				"x"
 			};
 
+			mathsolver_push_variable_table(expression, var_indexes, 1);
 			mathsolver_expression* eval = mathsolver_evaluate(expression, vars, 1);
+			mathsolver_pop_variable_table(expression, var_indexes, 1);
 			printf("Evaluated expression:\n");
 			printExpression(eval, 0);
-
-			printf("Starting stress test...\n");
-
-			clock_t begin = clock();
-			mathsolver_push_variable_table(expression, var_indexes, 1);
-			for (int i = 0; i < 1000000000; i++)
-			{
-				xExp->number = i;
-				mathsolver_expression* eval2 = mathsolver_evaluate(expression, vars, 1);
-			}
-			mathsolver_pop_variable_table(expression, var_indexes, 1);
-			clock_t end = clock();
-			double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-			printf("Time spent: %f\n", time_spent);
 
 			mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(eval);
 			printf("Inflated out:\n");
@@ -297,13 +275,9 @@ int main()
 				mathsolver_expression_free(&eval);
 
 			mathsolver_expression_free(&expression);
-			mathsolver_inflated_tokens_free(&inflated);
-			for (int i = 0; i < count; i++)
-			{
-				mathsolver_token_free(&tokens[i]);
-			}
 
 			printf("Done.\n");
+			break;
 		}
 	}
 	return 0;

@@ -115,6 +115,7 @@ typedef struct _mathsolver_expression
 	};
 	struct _mathsolver_expression* parent;
 	struct _mathsolver_expression* copy_of;
+	uint8_t flags;
 } mathsolver_expression;
 
 void mathsolver_token_free(mathsolver_token** token);
@@ -139,8 +140,15 @@ mathsolver_inflated_tokens* mathsolver_inflate(mathsolver_token** tokens, int nT
 int mathsolver_count_inflated(mathsolver_inflated_tokens* tokens);
 int mathsolver_deflate(mathsolver_inflated_tokens* tokens, mathsolver_token** deflated, int sDeflated);
 
+// Create expression with empty parent, type number and value [number]
+mathsolver_expression* mathsolver_number_expression(double number);
+// Parse, standardize, inflate, and get expression from input string (util for combining all other functions)
+mathsolver_expression* mathsolver_parsed_expression(char* str, int maxTokens);
+
+#define MATHSOLVER_EXPRESSION_FLAG_NONE (0)
+#define MATHSOLVER_EXPRESSION_FLAG_DO_NOT_REFERENCE_TOKEN (1<<0)
 // Note: requires standardized tokens
-mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens);
+mathsolver_expression* mathsolver_to_expression(mathsolver_inflated_tokens* tokens, uint8_t flags);
 mathsolver_inflated_tokens* mathsolver_from_expression(mathsolver_expression* expression);
 
 typedef struct
@@ -159,5 +167,6 @@ void mathsolver_push_variable_table(mathsolver_expression* expression, char** va
 void mathsolver_pop_variable_table(mathsolver_expression* expression, char** variables, int nVariables);
 
 mathsolver_expression* mathsolver_evaluate(mathsolver_expression* expression, mathsolver_variable* variables, int nVariables);
+mathsolver_expression* mathsolver_simplify(mathsolver_expression* expression);
 
 #endif

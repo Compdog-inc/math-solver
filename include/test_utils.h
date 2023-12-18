@@ -74,7 +74,7 @@ uint8_t token_isvar(mathsolver_token *token, char *cmp)
     int cl = (int)strlen(cmp);
     if (token->size != cl)
         return 0;
-    return token->type == Variable && strcmp(token->variable, cmp) == 0;
+    return token->type == Variable && strncmp(token->variable, cmp, token->size) == 0;
 }
 
 uint8_t token_isnum(mathsolver_token *token, double num)
@@ -99,5 +99,5 @@ uint8_t token_isnum(mathsolver_token *token, double num)
     if (token->size != len)
         return 0;
 
-    return token->type == Number && strcmp(token->number, buf) == 0;
+    return token->type == Number && strncmp(token->number, buf, token->size) == 0;
 }

@@ -6,10 +6,11 @@ int main()
     int count = mathsolver_parse("3x*(2x+(2y-3)+5)x(2(z/2)z)3x", tokens, 64);
     count = mathsolver_standardize(tokens, count, 64, 0);
     mathsolver_inflated_tokens* inflated = mathsolver_inflate(tokens, count);
-    mathsolver_expression* expression = mathsolver_to_expression(inflated);
+    mathsolver_expression* expression = mathsolver_to_expression(inflated, 0);
 
     mathsolver_inflated_tokens* inflatedOut = mathsolver_from_expression(expression);
     mathsolver_token* tokensOut[64];
+    
     int countOut = mathsolver_deflate(inflatedOut, tokensOut, 64);
     countOut = mathsolver_reduce(tokensOut, countOut);
 

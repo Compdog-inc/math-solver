@@ -193,6 +193,38 @@ add_test(
   COMMAND $<TARGET_FILE:expression_round>
 )
 
+# variable_inline_none
+add_executable(variable_inline_none tests/variable_inline_none.c)
+target_link_libraries(variable_inline_none PRIVATE math_solver)
+add_test(
+  NAME variable_inline_none
+  COMMAND $<TARGET_FILE:variable_inline_none>
+)
+
+# variable_inline_one
+add_executable(variable_inline_one tests/variable_inline_one.c)
+target_link_libraries(variable_inline_one PRIVATE math_solver)
+add_test(
+  NAME variable_inline_one
+  COMMAND $<TARGET_FILE:variable_inline_one>
+)
+
+# variable_table_none
+add_executable(variable_table_none tests/variable_table_none.c)
+target_link_libraries(variable_table_none PRIVATE math_solver)
+add_test(
+  NAME variable_table_none
+  COMMAND $<TARGET_FILE:variable_table_none>
+)
+
+# variable_table_one
+add_executable(variable_table_one tests/variable_table_one.c)
+target_link_libraries(variable_table_one PRIVATE math_solver)
+add_test(
+  NAME variable_table_one
+  COMMAND $<TARGET_FILE:variable_table_one>
+)
+
 target_include_directories(math_solver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
